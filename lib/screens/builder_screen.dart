@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import '../widgets/node_widget.dart';
 
 class BuilderScreen extends StatefulWidget {
   const BuilderScreen({super.key});
@@ -8,6 +10,21 @@ class BuilderScreen extends StatefulWidget {
 }
 
 class _BuilderScreenState extends State<BuilderScreen> {
+  final List<FlowNode> _nodes = [];
+  final Uuid _uuid = const Uuid();
+
+  void _addNode() {
+    setState(() {
+      _nodes.add(
+        FlowNode(
+          id: _uuid.v4(),
+          label: 'عقدة ${_nodes.length + 1}',
+          position: const Offset(200, 200),
+        ),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -17,9 +34,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'إضافة عقدة',
-            onPressed: () {
-              // TODO: إضافة عقدة جديدة لاحقاً
-            },
+            onPressed: _addNode,
           ),
         ],
       ),
@@ -32,9 +47,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
           width: 3000,
           height: 3000,
           child: Stack(
-            children: const [
-              // سنضيف العقد هنا لاحقاً
-            ],
+            children: _nodes.map((node) => NodeWidget(node: node)).toList(),
           ),
         ),
       ),
