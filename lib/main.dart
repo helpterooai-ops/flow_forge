@@ -1,24 +1,27 @@
 import 'package:flutter/material.dart';
+import 'screens/home_screen.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const FlowForgeApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class FlowForgeApp extends StatelessWidget {
+  const FlowForgeApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'FlowForge',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const Scaffold(
-        body: Center(
-          child: Text('Welcome to FlowForge'),
+        useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          centerTitle: true,
+          elevation: 0,
         ),
       ),
+      home: const HomeScreen(),
     );
   }
 }
