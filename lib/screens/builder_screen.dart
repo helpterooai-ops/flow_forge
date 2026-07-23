@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../widgets/node_widget.dart';
 
 class Connection {
@@ -33,24 +34,90 @@ class _BuilderScreenState extends State<BuilderScreen> {
   final List<Connection> _connections = [];
   final Uuid _uuid = const Uuid();
 
-  void _addNode() {
+  void _showAddNodeDialog() {
+    NodeType? selectedType;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('اختر نوع العقدة'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: NodeType.values.map((type) {
+            final label = _labelForType(type);
+            final color = _colorForType(type);
+            return ListTile(
+              leading: PhosphorIcon(
+                _phosphorIconForType(type),
+                color: color,
+              ),
+              title: Text(label),
+              onTap: () {
+                selectedType = type;
+                Navigator.pop(ctx);
+              },
+            );
+          }).toList(),
+        ),
+      ),
+    ).then((_) {
+      if (selectedType != null) {
+        _addNode(selectedType!);
+      }
+    });
+  }
+
+  String _labelForType(NodeType type) {
+    switch (type) {
+      case NodeType.message:
+        return 'رسالة';
+      case NodeType.question:
+        return 'سؤال';
+      case NodeType.action:
+        return 'إجراء';
+      case NodeType.condition:
+        return 'شرط';
+    }
+  }
+
+  Color _colorForType(NodeType type) {
+    switch (type) {
+      case NodeType.message:
+        return const Color(0xFF6366F1);
+      case NodeType.question:
+        return const Color(0xFF0EA5E9);
+      case NodeType.action:
+        return const Color(0xFF10B981);
+      case NodeType.condition:
+        return const Color(0xFFF59E0B);
+    }
+  }
+
+  PhosphorIconData _phosphorIconForType(NodeType type) {
+    switch (type) {
+      case NodeType.message:
+        return PhosphorIconsDuotone.chatCenteredDots;
+      case NodeType.question:
+        return PhosphorIconsDuotone.question;
+      case NodeType.action:
+        return PhosphorIconsDuotone.gearFine;
+      case NodeType.condition:
+        return PhosphorIconsDuotone.gitFork;
+    }
+  }
+
+  void _addNode(NodeType type) {
     setState(() {
       _nodes.add(
         FlowNode(
           id: _uuid.v4(),
-          title: 'عقدة جديدة',
+          title: _labelForType(type),
           subtitle: 'انقر للكتابة...',
           position: Offset(
             250 + (_nodes.length * 20) % 200,
             250 + (_nodes.length * 30) % 200,
           ),
-          color: [
-            const Color(0xFF6366F1),
-            const Color(0xFF0EA5E9),
-            const Color(0xFF10B981),
-            const Color(0xFFF59E0B),
-            const Color(0xFFEF4444),
-          ][_nodes.length % 5],
+          color: _colorForType(type),
+          type: type,
         ),
       );
     });
@@ -101,6 +168,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
       'nodes': _nodes
           .map((n) => {
                 'id': n.id,
+                'type': n.type.name,
                 'title': n.title,
                 'subtitle': n.subtitle,
                 'color': n.color.value.toRadixString(16),
@@ -181,8 +249,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
                 color: const Color(0xFF6366F1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child:
-                  const Icon(Icons.save_alt_rounded, color: Colors.white, size: 24),
+              child: const Icon(Icons.save_alt_rounded,
+                  color: Colors.white, size: 24),
             ),
             tooltip: 'تصدير الخريطة',
             onPressed: _exportJSON,
@@ -195,11 +263,10 @@ class _BuilderScreenState extends State<BuilderScreen> {
                 color: const Color(0xFF6366F1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child:
-                  const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+              child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
             ),
             tooltip: 'إضافة عقدة',
-            onPressed: _addNode,
+            onPressed: _showAddNodeDialog,
           ),
           const SizedBox(width: 12),
         ],
@@ -226,8 +293,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
                 ),
               ),
               ..._connections.map((conn) {
-                final from =
-                    _nodes.firstWhere((n) => n.id == conn.fromNodeId);
+                final from = _nodes.firstWhere((n) => n.id == conn.fromNodeId);
                 final to = _nodes.firstWhere((n) => n.id == conn.toNodeId);
                 return ConnectionDeleteButton(
                   connection: conn,
@@ -266,8 +332,7 @@ class ConnectionPainter extends CustomPainter {
       final fromNode = nodes.firstWhere((n) => n.id == conn.fromNodeId);
       final toNode = nodes.firstWhere((n) => n.id == conn.toNodeId);
 
-      final start = Offset(
-          fromNode.position.dx + 200, fromNode.position.dy + 40);
+      final start = Offset(fromNode.position.dx + 200, fromNode.position.dy + 40);
       final end = Offset(toNode.position.dx, toNode.position.dy + 40);
 
       final paint = Paint()
@@ -278,8 +343,7 @@ class ConnectionPainter extends CustomPainter {
 
       final path = Path()
         ..moveTo(start.dx, start.dy)
-        ..cubicTo(
-            start.dx + 60, start.dy, end.dx - 60, end.dy, end.dx, end.dy);
+        ..cubicTo(start.dx + 60, start.dy, end.dx - 60, end.dy, end.dx, end.dy);
 
       canvas.drawPath(path, paint);
     }
@@ -305,8 +369,7 @@ class ConnectionDeleteButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final start =
-        Offset(fromNode.position.dx + 200, fromNode.position.dy + 40);
+    final start = Offset(fromNode.position.dx + 200, fromNode.position.dy + 40);
     final end = Offset(toNode.position.dx, toNode.position.dy + 40);
     final mid = Offset((start.dx + end.dx) / 2, (start.dy + end.dy) / 2);
 

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+
+enum NodeType { message, question, action, condition }
 
 class FlowNode {
   final String id;
@@ -6,6 +9,7 @@ class FlowNode {
   String subtitle;
   Offset position;
   Color color;
+  NodeType type;
 
   FlowNode({
     required this.id,
@@ -13,6 +17,7 @@ class FlowNode {
     this.subtitle = '',
     required this.position,
     this.color = const Color(0xFF6366F1),
+    this.type = NodeType.message,
   });
 }
 
@@ -74,7 +79,7 @@ class _NodeWidgetState extends State<NodeWidget> {
   void _startEditing() {
     setState(() {
       _isEditing = true;
-      _titleController.text = widget.node.title; // reset to current title
+      _titleController.text = widget.node.title;
     });
     _focusNode.requestFocus();
   }
@@ -83,7 +88,21 @@ class _NodeWidgetState extends State<NodeWidget> {
     setState(() {
       _isEditing = false;
     });
-    _titleController.text = widget.node.title; // restore original
+    _titleController.text = widget.node.title;
+  }
+
+  // استخدام فوسفور ديوطون – مظهر حديث جداً
+  PhosphorIconData _iconForType(NodeType type) {
+    switch (type) {
+      case NodeType.message:
+        return PhosphorIconsDuotone.chatCenteredDots; // فقاعة محادثة بنقاط
+      case NodeType.question:
+        return PhosphorIconsDuotone.question; // دائرة بها علامة سؤال
+      case NodeType.action:
+        return PhosphorIconsDuotone.gearFine; // ترس (إجراء)
+      case NodeType.condition:
+        return PhosphorIconsDuotone.gitFork; // تفرع (شرط)
+    }
   }
 
   @override
@@ -128,7 +147,6 @@ class _NodeWidgetState extends State<NodeWidget> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // العقدة نفسها
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -156,8 +174,11 @@ class _NodeWidgetState extends State<NodeWidget> {
                             color: widget.node.color.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(Icons.chat_bubble_outline_rounded,
-                              size: 18, color: widget.node.color),
+                          child: PhosphorIcon(
+                            _iconForType(widget.node.type),
+                            size: 18,
+                            color: widget.node.color,
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -203,7 +224,7 @@ class _NodeWidgetState extends State<NodeWidget> {
                   ],
                 ),
               ),
-              // نقاط التوصيل (تجميلية)
+              // نقاط التوصيل
               Positioned(
                 right: -6,
                 top: 0,
