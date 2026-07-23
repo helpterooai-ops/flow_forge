@@ -114,7 +114,7 @@ class _NodeWidgetState extends State<NodeWidget> {
       case NodeType.input:
         return Iconsax.text_block;
       case NodeType.intent:
-        return Iconsax.brain;
+        return Icons.psychology_rounded;   // تم التصحيح
     }
   }
 
