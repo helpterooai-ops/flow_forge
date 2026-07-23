@@ -110,7 +110,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
       case NodeType.input:
         return Iconsax.text_block;
       case NodeType.intent:
-        return Iconsax.brain;
+        return Icons.psychology_rounded;   // تم التصحيح
     }
   }
 
