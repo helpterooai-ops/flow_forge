@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:iconsax/iconsax.dart';
 import '../widgets/node_widget.dart';
 
 class Connection {
@@ -46,10 +46,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
             final label = _labelForType(type);
             final color = _colorForType(type);
             return ListTile(
-              leading: PhosphorIcon(
-                _phosphorIconForType(type),
-                color: color,
-              ),
+              leading: Icon(_iconForType(type), color: color),
               title: Text(label),
               onTap: () {
                 selectedType = type;
@@ -92,16 +89,16 @@ class _BuilderScreenState extends State<BuilderScreen> {
     }
   }
 
-  PhosphorIconData _phosphorIconForType(NodeType type) {
+  IconData _iconForType(NodeType type) {
     switch (type) {
       case NodeType.message:
-        return PhosphorIconsDuotone.chatCenteredDots;
+        return Iconsax.message;
       case NodeType.question:
-        return PhosphorIconsDuotone.question;
+        return Iconsax.message_question;
       case NodeType.action:
-        return PhosphorIconsDuotone.gearFine;
+        return Iconsax.setting_2;
       case NodeType.condition:
-        return PhosphorIconsDuotone.gitFork;
+        return Iconsax.arrow_3;
     }
   }
 
