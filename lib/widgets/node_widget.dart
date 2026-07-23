@@ -34,6 +34,7 @@ class NodeWidget extends StatelessWidget {
       left: node.position.dx,
       top: node.position.dy,
       child: GestureDetector(
+        // السحب لتحريك العقدة يعمل على كامل العقدة
         onPanUpdate: (details) {
           onDrag?.call(details.delta);
         },
@@ -64,14 +65,40 @@ class NodeWidget extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: node.color.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(8),
+                        // الأيقونة + السحب لإنشاء اتصال
+                        Draggable<String>(
+                          data: node.id,
+                          feedback: Material(
+                            color: Colors.transparent,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: node.color,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.chat_bubble_outline_rounded,
+                                  color: Colors.white, size: 18),
+                            ),
                           ),
-                          child: Icon(Icons.chat_bubble_outline_rounded,
-                              size: 18, color: node.color),
+                          childWhenDragging: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.chat_bubble_outline_rounded,
+                                size: 18, color: node.color.withOpacity(0.3)),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: node.color.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.chat_bubble_outline_rounded,
+                                size: 18, color: node.color),
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -100,74 +127,52 @@ class NodeWidget extends StatelessWidget {
                   ],
                 ),
               ),
-              // نقطة التوصيل اليمنى (قابلة للسحب - Draggable)
+              // نقطة التوصيل اليمنى (للإفلات فقط - DragTarget)
               Positioned(
                 right: -6,
                 top: 0,
                 bottom: 0,
-                child: Draggable<String>(
-                  data: node.id, // نحمل معرف العقدة المصدر
-                  feedback: Material(
-                    color: Colors.transparent,
-                    child: Container(
+                child: DragTarget<String>(
+                  onAcceptWithDetails: (details) {
+                    onConnectionCreated?.call(details.data, node.id);
+                  },
+                  builder: (context, candidateData, rejectedData) {
+                    final isHovering = candidateData.isNotEmpty;
+                    return Container(
                       width: 12,
                       height: 12,
                       decoration: BoxDecoration(
-                        color: node.color,
+                        color: isHovering ? Colors.yellow : node.color,
                         shape: BoxShape.circle,
+                        border: Border.all(
+                            color: isHovering ? Colors.yellow : Colors.white, width: 2),
                         boxShadow: const [
-                          BoxShadow(color: Colors.black38, blurRadius: 4),
+                          BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 4,
+                              offset: Offset(0, 2)),
                         ],
                       ),
-                    ),
-                  ),
-                  childWhenDragging: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: const BoxDecoration(
-                      color: Colors.grey,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: node.color,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: const [
-                        BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 4,
-                            offset: Offset(0, 2)),
-                      ],
-                    ),
-                  ),
+                    );
+                  },
                 ),
               ),
-              // نقطة التوصيل اليسرى (مستقبلة - DragTarget)
+              // نقطة التوصيل اليسرى (للإفلات فقط - DragTarget)
               Positioned(
                 left: -6,
                 top: 0,
                 bottom: 0,
                 child: DragTarget<String>(
                   onAcceptWithDetails: (details) {
-                    // تم إسقاط عقدة مصدر فوق هذه النقطة
-                    final fromId = details.data;
-                    final toId = node.id;
-                    if (fromId != toId) {
-                      onConnectionCreated?.call(fromId, toId);
-                    }
+                    onConnectionCreated?.call(details.data, node.id);
                   },
                   builder: (context, candidateData, rejectedData) {
-                    // تغيير اللون عند وجود عنصر فوقه
                     final isHovering = candidateData.isNotEmpty;
                     return Container(
                       width: 12,
                       height: 12,
                       decoration: BoxDecoration(
-                        color: isHovering ? node.color : node.color.withOpacity(0.7),
+                        color: isHovering ? Colors.yellow : node.color,
                         shape: BoxShape.circle,
                         border: Border.all(
                             color: isHovering ? Colors.yellow : Colors.white, width: 2),
