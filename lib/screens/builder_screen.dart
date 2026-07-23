@@ -110,7 +110,14 @@ class _BuilderScreenState extends State<BuilderScreen> {
     }
 
     if (closestNode != null) {
-      _addConnection(movedNode.id, closestNode.id);
+      // تحديد الاتجاه: العقدة اليسرى تصبح المصدر، والعقدة اليمنى الهدف
+      final leftNode = movedNode.position.dx < closestNode.position.dx
+          ? movedNode
+          : closestNode;
+      final rightNode = movedNode.position.dx < closestNode.position.dx
+          ? closestNode
+          : movedNode;
+      _addConnection(leftNode.id, rightNode.id);
     }
   }
 
@@ -185,7 +192,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
 }
 
 // -----------------------------------------------
-// رسام الخطوط
+// رسام الخطوط (منحنيات بيزير)
 class ConnectionPainter extends CustomPainter {
   final List<Connection> connections;
   final List<FlowNode> nodes;
@@ -198,8 +205,10 @@ class ConnectionPainter extends CustomPainter {
       final fromNode = nodes.firstWhere((n) => n.id == conn.fromNodeId);
       final toNode = nodes.firstWhere((n) => n.id == conn.toNodeId);
 
+      // نقطة البداية: مركز نقطة التوصيل اليمنى للعقدة المصدر
       final start = Offset(
           fromNode.position.dx + 200, fromNode.position.dy + 40);
+      // نقطة النهاية: مركز نقطة التوصيل اليسرى للعقدة الهدف
       final end = Offset(toNode.position.dx, toNode.position.dy + 40);
 
       final paint = Paint()
@@ -265,7 +274,7 @@ class ConnectionDeleteButton extends StatelessWidget {
 }
 
 // -----------------------------------------------
-// شبكة الخلفية
+// شبكة الخلفية (Dot Grid)
 class GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
