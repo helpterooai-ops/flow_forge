@@ -20,8 +20,8 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   fonts:
-    - family: Cairo
+    - family: IBMPlexSansArabic
       fonts:
-        - asset: assets/fonts/Cairo-Regular.ttf
-        - asset: assets/fonts/Cairo-Bold.ttf
+        - asset: assets/fonts/IBMPlexSansArabic-Regular.ttf
+        - asset: assets/fonts/IBMPlexSansArabic-Bold.ttf
           weight: 700
