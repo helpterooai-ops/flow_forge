@@ -12,7 +12,7 @@ class FlowNode {
     required this.title,
     this.subtitle = '',
     required this.position,
-    this.color = const Color(0xFF5C6BC0), // لون أزرق أنيق
+    this.color = const Color(0xFF6366F1),
   });
 }
 
@@ -27,43 +27,42 @@ class NodeWidget extends StatelessWidget {
       left: node.position.dx,
       top: node.position.dy,
       child: Container(
-        width: 180,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        width: 200,
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Colors.white.withOpacity(0.8),
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: node.color.withOpacity(0.4), width: 1),
           boxShadow: [
             BoxShadow(
-              color: node.color.withOpacity(0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
+              color: node.color.withOpacity(0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
           ],
-          border: Border.all(color: node.color.withOpacity(0.6), width: 1.5),
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: node.color.withOpacity(0.2),
+                    color: node.color.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Icons.chat_bubble_outline, size: 18, color: node.color),
+                  child: Icon(Icons.chat_bubble_outline_rounded, size: 18, color: node.color),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     node.title,
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
                       color: node.color,
-                      height: 1.2,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -71,11 +70,11 @@ class NodeWidget extends StatelessWidget {
               ],
             ),
             if (node.subtitle.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Text(
                 node.subtitle,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-                maxLines: 2,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
             ],

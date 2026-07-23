@@ -14,11 +14,24 @@ class FlowForgeApp extends StatelessWidget {
       title: 'FlowForge',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        fontFamily: 'Cairo',
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF6366F1),
+          brightness: Brightness.light,
+        ),
         useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
         appBarTheme: const AppBarTheme(
-          centerTitle: true,
+          backgroundColor: Color(0xFFF8FAFC),
+          foregroundColor: Color(0xFF1E293B),
           elevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            fontFamily: 'Cairo',
+            fontWeight: FontWeight.w700,
+            fontSize: 22,
+            color: Color(0xFF1E293B),
+          ),
         ),
       ),
       home: const HomeScreen(),
