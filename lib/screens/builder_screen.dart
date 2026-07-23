@@ -18,7 +18,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
       _nodes.add(
         FlowNode(
           id: _uuid.v4(),
-          label: 'عقدة ${_nodes.length + 1}',
+          title: 'نص ترحيبي'
+          subtitle: 'السلام عليكم! كيف أقدر أساعدك؟',
           position: const Offset(200, 200),
         ),
       );
