@@ -36,6 +36,15 @@ class _BuilderScreenState extends State<BuilderScreen> {
     });
   }
 
+  void _onNodeMoved(String id, Offset delta) {
+    setState(() {
+      final index = _nodes.indexWhere((n) => n.id == id);
+      if (index != -1) {
+        _nodes[index].position += delta;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,7 +80,10 @@ class _BuilderScreenState extends State<BuilderScreen> {
                 size: const Size(3000, 3000),
                 painter: GridPainter(),
               ),
-              ..._nodes.map((node) => NodeWidget(node: node)),
+              ..._nodes.map((node) => NodeWidget(
+                    node: node,
+                    onDrag: (delta) => _onNodeMoved(node.id, delta),
+                  )),
             ],
           ),
         ),
