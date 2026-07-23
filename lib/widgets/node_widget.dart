@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
-enum NodeType { message, question, action, condition }
+enum NodeType { message, question, action, condition, input, intent }
 
 class FlowNode {
   final String id;
@@ -11,6 +11,12 @@ class FlowNode {
   Color color;
   NodeType type;
 
+  // الحقول الجديدة
+  String variableName;   // اسم المتغير (للاستخدام مع input)
+  String prompt;         // السؤال الذي يُعرض على العميل
+  bool isPaused;         // تحويل بشري
+  String? fallbackNodeId; // عقدة احتياطية
+
   FlowNode({
     required this.id,
     required this.title,
@@ -18,6 +24,10 @@ class FlowNode {
     required this.position,
     this.color = const Color(0xFF6366F1),
     this.type = NodeType.message,
+    this.variableName = '',
+    this.prompt = '',
+    this.isPaused = false,
+    this.fallbackNodeId,
   });
 }
 
@@ -91,17 +101,20 @@ class _NodeWidgetState extends State<NodeWidget> {
     _titleController.text = widget.node.title;
   }
 
-  // أيقونات Iconsax الحديثة جداً
   IconData _iconForType(NodeType type) {
     switch (type) {
       case NodeType.message:
-        return Iconsax.message;              // فقاعة رسالة
+        return Iconsax.message;
       case NodeType.question:
-        return Iconsax.message_question;      // فقاعة مع سؤال
+        return Iconsax.message_question;
       case NodeType.action:
-        return Iconsax.setting_2;             // ترس حديث
+        return Iconsax.setting_2;
       case NodeType.condition:
-        return Iconsax.arrow_3;               // تفرع
+        return Iconsax.arrow_3;
+      case NodeType.input:
+        return Iconsax.text_block;
+      case NodeType.intent:
+        return Iconsax.brain;
     }
   }
 

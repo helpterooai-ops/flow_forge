@@ -73,6 +73,10 @@ class _BuilderScreenState extends State<BuilderScreen> {
         return 'إجراء';
       case NodeType.condition:
         return 'شرط';
+      case NodeType.input:
+        return 'إدخال مباشر';
+      case NodeType.intent:
+        return 'تصنيف نية';
     }
   }
 
@@ -86,6 +90,10 @@ class _BuilderScreenState extends State<BuilderScreen> {
         return const Color(0xFF10B981);
       case NodeType.condition:
         return const Color(0xFFF59E0B);
+      case NodeType.input:
+        return const Color(0xFFF97316);
+      case NodeType.intent:
+        return const Color(0xFF8B5CF6);
     }
   }
 
@@ -99,6 +107,10 @@ class _BuilderScreenState extends State<BuilderScreen> {
         return Iconsax.setting_2;
       case NodeType.condition:
         return Iconsax.arrow_3;
+      case NodeType.input:
+        return Iconsax.text_block;
+      case NodeType.intent:
+        return Iconsax.brain;
     }
   }
 
@@ -115,6 +127,10 @@ class _BuilderScreenState extends State<BuilderScreen> {
           ),
           color: _colorForType(type),
           type: type,
+          variableName: type == NodeType.input ? 'input_${_nodes.length}' : '',
+          prompt: type == NodeType.input ? 'أدخل القيمة هنا' : '',
+          isPaused: false,
+          fallbackNodeId: null,
         ),
       );
     });
@@ -171,6 +187,10 @@ class _BuilderScreenState extends State<BuilderScreen> {
                 'color': n.color.value.toRadixString(16),
                 'x': n.position.dx,
                 'y': n.position.dy,
+                'variableName': n.variableName,
+                'prompt': n.prompt,
+                'isPaused': n.isPaused,
+                'fallbackNodeId': n.fallbackNodeId,
               })
           .toList(),
       'connections': _connections.map((c) => c.toJson()).toList(),
@@ -329,7 +349,8 @@ class ConnectionPainter extends CustomPainter {
       final fromNode = nodes.firstWhere((n) => n.id == conn.fromNodeId);
       final toNode = nodes.firstWhere((n) => n.id == conn.toNodeId);
 
-      final start = Offset(fromNode.position.dx + 200, fromNode.position.dy + 40);
+      final start = Offset(
+          fromNode.position.dx + 200, fromNode.position.dy + 40);
       final end = Offset(toNode.position.dx, toNode.position.dy + 40);
 
       final paint = Paint()
@@ -340,7 +361,8 @@ class ConnectionPainter extends CustomPainter {
 
       final path = Path()
         ..moveTo(start.dx, start.dy)
-        ..cubicTo(start.dx + 60, start.dy, end.dx - 60, end.dy, end.dx, end.dy);
+        ..cubicTo(
+            start.dx + 60, start.dy, end.dx - 60, end.dy, end.dx, end.dy);
 
       canvas.drawPath(path, paint);
     }
@@ -366,7 +388,8 @@ class ConnectionDeleteButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final start = Offset(fromNode.position.dx + 200, fromNode.position.dy + 40);
+    final start =
+        Offset(fromNode.position.dx + 200, fromNode.position.dy + 40);
     final end = Offset(toNode.position.dx, toNode.position.dy + 40);
     final mid = Offset((start.dx + end.dx) / 2, (start.dy + end.dy) / 2);
 
