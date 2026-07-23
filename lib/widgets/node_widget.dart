@@ -19,13 +19,11 @@ class FlowNode {
 class NodeWidget extends StatelessWidget {
   final FlowNode node;
   final void Function(Offset delta)? onDrag;
-  final void Function(String fromId, String toId)? onConnectionCreated;
 
   const NodeWidget({
     super.key,
     required this.node,
     this.onDrag,
-    this.onConnectionCreated,
   });
 
   @override
@@ -34,7 +32,6 @@ class NodeWidget extends StatelessWidget {
       left: node.position.dx,
       top: node.position.dy,
       child: GestureDetector(
-        // السحب لتحريك العقدة يعمل على كامل العقدة
         onPanUpdate: (details) {
           onDrag?.call(details.delta);
         },
@@ -65,40 +62,14 @@ class NodeWidget extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        // الأيقونة + السحب لإنشاء اتصال
-                        Draggable<String>(
-                          data: node.id,
-                          feedback: Material(
-                            color: Colors.transparent,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: node.color,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(Icons.chat_bubble_outline_rounded,
-                                  color: Colors.white, size: 18),
-                            ),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: node.color.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          childWhenDragging: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(Icons.chat_bubble_outline_rounded,
-                                size: 18, color: node.color.withOpacity(0.3)),
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: node.color.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(Icons.chat_bubble_outline_rounded,
-                                size: 18, color: node.color),
-                          ),
+                          child: Icon(Icons.chat_bubble_outline_rounded,
+                              size: 18, color: node.color),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -127,64 +98,50 @@ class NodeWidget extends StatelessWidget {
                   ],
                 ),
               ),
-              // نقطة التوصيل اليمنى (للإفلات فقط - DragTarget)
+              // نقطة يمنى (تجميل)
               Positioned(
                 right: -6,
                 top: 0,
                 bottom: 0,
-                child: DragTarget<String>(
-                  onAcceptWithDetails: (details) {
-                    onConnectionCreated?.call(details.data, node.id);
-                  },
-                  builder: (context, candidateData, rejectedData) {
-                    final isHovering = candidateData.isNotEmpty;
-                    return Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: isHovering ? Colors.yellow : node.color,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: isHovering ? Colors.yellow : Colors.white, width: 2),
-                        boxShadow: const [
-                          BoxShadow(
-                              color: Colors.black26,
-                              blurRadius: 4,
-                              offset: Offset(0, 2)),
-                        ],
-                      ),
-                    );
-                  },
+                child: Center(
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: node.color,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: const [
+                        BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 4,
+                            offset: Offset(0, 2)),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              // نقطة التوصيل اليسرى (للإفلات فقط - DragTarget)
+              // نقطة يسرى (تجميل)
               Positioned(
                 left: -6,
                 top: 0,
                 bottom: 0,
-                child: DragTarget<String>(
-                  onAcceptWithDetails: (details) {
-                    onConnectionCreated?.call(details.data, node.id);
-                  },
-                  builder: (context, candidateData, rejectedData) {
-                    final isHovering = candidateData.isNotEmpty;
-                    return Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: isHovering ? Colors.yellow : node.color,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: isHovering ? Colors.yellow : Colors.white, width: 2),
-                        boxShadow: const [
-                          BoxShadow(
-                              color: Colors.black26,
-                              blurRadius: 4,
-                              offset: Offset(0, 2)),
-                        ],
-                      ),
-                    );
-                  },
+                child: Center(
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: node.color,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: const [
+                        BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 4,
+                            offset: Offset(0, 2)),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],

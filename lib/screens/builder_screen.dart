@@ -56,14 +56,16 @@ class _BuilderScreenState extends State<BuilderScreen> {
         _nodes[index].position += delta;
       }
     });
+    // بعد كل حركة، نفحص القرب ونوصل تلقائيًا
+    _checkProximity(id);
   }
 
   void _addConnection(String fromId, String toId) {
-    // منع توصيل العقدة بنفسها أو التكرار
     if (fromId == toId) return;
-    final exists = _connections.any(
-      (c) => c.fromNodeId == fromId && c.toNodeId == toId,
-    );
+    // منع التكرار (بأي اتجاه)
+    final exists = _connections.any((c) =>
+        (c.fromNodeId == fromId && c.toNodeId == toId) ||
+        (c.fromNodeId == toId && c.toNodeId == fromId));
     if (!exists) {
       setState(() {
         _connections.add(Connection(
@@ -72,6 +74,43 @@ class _BuilderScreenState extends State<BuilderScreen> {
           toNodeId: toId,
         ));
       });
+    }
+  }
+
+  void _deleteConnection(String connId) {
+    setState(() {
+      _connections.removeWhere((c) => c.id == connId);
+    });
+  }
+
+  void _checkProximity(String nodeId) {
+    final movedNode = _nodes.firstWhere((n) => n.id == nodeId);
+    final movedCenter =
+        Offset(movedNode.position.dx + 100, movedNode.position.dy + 40);
+
+    FlowNode? closestNode;
+    double minDist = double.infinity;
+
+    for (final other in _nodes) {
+      if (other.id == nodeId) continue;
+      final otherCenter =
+          Offset(other.position.dx + 100, other.position.dy + 40);
+      final dist = (movedCenter - otherCenter).distance;
+
+      if (dist < 150 && dist < minDist) {
+        // لم يتم توصيلهما بعد (بأي اتجاه)
+        final alreadyConnected = _connections.any((c) =>
+            (c.fromNodeId == movedNode.id && c.toNodeId == other.id) ||
+            (c.fromNodeId == other.id && c.toNodeId == movedNode.id));
+        if (!alreadyConnected) {
+          minDist = dist;
+          closestNode = other;
+        }
+      }
+    }
+
+    if (closestNode != null) {
+      _addConnection(movedNode.id, closestNode.id);
     }
   }
 
@@ -88,7 +127,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
                 color: const Color(0xFF6366F1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+              child:
+                  const Icon(Icons.add_rounded, color: Colors.white, size: 24),
             ),
             tooltip: 'إضافة عقدة',
             onPressed: _addNode,
@@ -106,11 +146,12 @@ class _BuilderScreenState extends State<BuilderScreen> {
           height: 3000,
           child: Stack(
             children: [
+              // شبكة الخلفية
               CustomPaint(
                 size: const Size(3000, 3000),
                 painter: GridPainter(),
               ),
-              // رسم الخطوط بين العقد
+              // رسم الخطوط
               CustomPaint(
                 size: const Size(3000, 3000),
                 painter: ConnectionPainter(
@@ -118,11 +159,22 @@ class _BuilderScreenState extends State<BuilderScreen> {
                   nodes: _nodes,
                 ),
               ),
-              // العقد مع دعم السحب والتوصيل
+              // أزرار الحذف فوق الخطوط
+              ..._connections.map((conn) {
+                final from =
+                    _nodes.firstWhere((n) => n.id == conn.fromNodeId);
+                final to = _nodes.firstWhere((n) => n.id == conn.toNodeId);
+                return ConnectionDeleteButton(
+                  connection: conn,
+                  fromNode: from,
+                  toNode: to,
+                  onDelete: () => _deleteConnection(conn.id),
+                );
+              }),
+              // العقد (قابلة للسحب)
               ..._nodes.map((node) => NodeWidget(
                     node: node,
                     onDrag: (delta) => _onNodeMoved(node.id, delta),
-                    onConnectionCreated: _addConnection,
                   )),
             ],
           ),
@@ -132,7 +184,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
   }
 }
 
-// رسام الخطوط (منحنيات بيزير)
+// -----------------------------------------------
+// رسام الخطوط
 class ConnectionPainter extends CustomPainter {
   final List<Connection> connections;
   final List<FlowNode> nodes;
@@ -145,9 +198,8 @@ class ConnectionPainter extends CustomPainter {
       final fromNode = nodes.firstWhere((n) => n.id == conn.fromNodeId);
       final toNode = nodes.firstWhere((n) => n.id == conn.toNodeId);
 
-      // نقطة البداية: مركز نقطة التوصيل اليمنى للعقدة المصدر
-      final start = Offset(fromNode.position.dx + 200, fromNode.position.dy + 40);
-      // نقطة النهاية: مركز نقطة التوصيل اليسرى للعقدة الهدف
+      final start = Offset(
+          fromNode.position.dx + 200, fromNode.position.dy + 40);
       final end = Offset(toNode.position.dx, toNode.position.dy + 40);
 
       final paint = Paint()
@@ -158,7 +210,8 @@ class ConnectionPainter extends CustomPainter {
 
       final path = Path()
         ..moveTo(start.dx, start.dy)
-        ..cubicTo(start.dx + 60, start.dy, end.dx - 60, end.dy, end.dx, end.dy);
+        ..cubicTo(
+            start.dx + 60, start.dy, end.dx - 60, end.dy, end.dx, end.dy);
 
       canvas.drawPath(path, paint);
     }
@@ -168,6 +221,51 @@ class ConnectionPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
+// -----------------------------------------------
+// زر حذف الاتصال (يظهر في منتصف الخط)
+class ConnectionDeleteButton extends StatelessWidget {
+  final Connection connection;
+  final FlowNode fromNode;
+  final FlowNode toNode;
+  final VoidCallback onDelete;
+
+  const ConnectionDeleteButton({
+    super.key,
+    required this.connection,
+    required this.fromNode,
+    required this.toNode,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final start =
+        Offset(fromNode.position.dx + 200, fromNode.position.dy + 40);
+    final end = Offset(toNode.position.dx, toNode.position.dy + 40);
+    final mid = Offset((start.dx + end.dx) / 2, (start.dy + end.dy) / 2);
+
+    return Positioned(
+      left: mid.dx - 15,
+      top: mid.dy - 15,
+      child: GestureDetector(
+        onTap: onDelete,
+        child: Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: Colors.red,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          child: const Icon(Icons.close, color: Colors.white, size: 18),
+        ),
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------
+// شبكة الخلفية
 class GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
