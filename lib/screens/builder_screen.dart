@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../widgets/node_widget.dart';
@@ -12,6 +13,12 @@ class Connection {
     required this.fromNodeId,
     required this.toNodeId,
   });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'from': fromNodeId,
+        'to': toNodeId,
+      };
 }
 
 class BuilderScreen extends StatefulWidget {
@@ -31,8 +38,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
       _nodes.add(
         FlowNode(
           id: _uuid.v4(),
-          title: 'رسالة ترحيب',
-          subtitle: 'مرحباً بك! كيف يمكنني مساعدتك اليوم؟',
+          title: 'عقدة جديدة',
+          subtitle: 'انقر للكتابة...',
           position: Offset(
             250 + (_nodes.length * 20) % 200,
             250 + (_nodes.length * 30) % 200,
@@ -59,48 +66,12 @@ class _BuilderScreenState extends State<BuilderScreen> {
     _checkProximity(id);
   }
 
-  void _editNode(String nodeId) {
-    final node = _nodes.firstWhere((n) => n.id == nodeId);
-    final titleController = TextEditingController(text: node.title);
-    final subtitleController = TextEditingController(text: node.subtitle);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('تعديل العقدة'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleController,
-              decoration: const InputDecoration(labelText: 'العنوان'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: subtitleController,
-              decoration: const InputDecoration(labelText: 'الوصف'),
-              maxLines: 2,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                node.title = titleController.text;
-                node.subtitle = subtitleController.text;
-              });
-              Navigator.pop(ctx);
-            },
-            child: const Text('حفظ'),
-          ),
-        ],
-      ),
-    );
+  void _deleteNode(String nodeId) {
+    setState(() {
+      _nodes.removeWhere((n) => n.id == nodeId);
+      _connections.removeWhere(
+          (c) => c.fromNodeId == nodeId || c.toNodeId == nodeId);
+    });
   }
 
   void _addConnection(String fromId, String toId) {
@@ -123,6 +94,42 @@ class _BuilderScreenState extends State<BuilderScreen> {
     setState(() {
       _connections.removeWhere((c) => c.id == connId);
     });
+  }
+
+  void _exportJSON() {
+    final map = {
+      'nodes': _nodes
+          .map((n) => {
+                'id': n.id,
+                'title': n.title,
+                'subtitle': n.subtitle,
+                'color': n.color.value.toRadixString(16),
+                'x': n.position.dx,
+                'y': n.position.dy,
+              })
+          .toList(),
+      'connections': _connections.map((c) => c.toJson()).toList(),
+    };
+    final jsonString = const JsonEncoder.withIndent('  ').convert(map);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('🎉 تم تصدير الخريطة'),
+        content: SingleChildScrollView(
+          child: SelectableText(
+            jsonString,
+            style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('حسناً'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _checkProximity(String nodeId) {
@@ -175,6 +182,20 @@ class _BuilderScreenState extends State<BuilderScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child:
+                  const Icon(Icons.save_alt_rounded, color: Colors.white, size: 24),
+            ),
+            tooltip: 'تصدير الخريطة',
+            onPressed: _exportJSON,
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6366F1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child:
                   const Icon(Icons.add_rounded, color: Colors.white, size: 24),
             ),
             tooltip: 'إضافة عقدة',
@@ -193,12 +214,10 @@ class _BuilderScreenState extends State<BuilderScreen> {
           height: 3000,
           child: Stack(
             children: [
-              // شبكة الخلفية
               CustomPaint(
                 size: const Size(3000, 3000),
                 painter: GridPainter(),
               ),
-              // رسم الخطوط
               CustomPaint(
                 size: const Size(3000, 3000),
                 painter: ConnectionPainter(
@@ -206,7 +225,6 @@ class _BuilderScreenState extends State<BuilderScreen> {
                   nodes: _nodes,
                 ),
               ),
-              // أزرار الحذف فوق الخطوط
               ..._connections.map((conn) {
                 final from =
                     _nodes.firstWhere((n) => n.id == conn.fromNodeId);
@@ -218,11 +236,15 @@ class _BuilderScreenState extends State<BuilderScreen> {
                   onDelete: () => _deleteConnection(conn.id),
                 );
               }),
-              // العقد (قابلة للسحب والنقر)
               ..._nodes.map((node) => NodeWidget(
                     node: node,
                     onDrag: (delta) => _onNodeMoved(node.id, delta),
-                    onTap: () => _editNode(node.id),
+                    onTitleChanged: (newTitle) {
+                      setState(() {
+                        node.title = newTitle;
+                      });
+                    },
+                    onDelete: () => _deleteNode(node.id),
                   )),
             ],
           ),
@@ -232,8 +254,6 @@ class _BuilderScreenState extends State<BuilderScreen> {
   }
 }
 
-// -----------------------------------------------
-// رسام الخطوط
 class ConnectionPainter extends CustomPainter {
   final List<Connection> connections;
   final List<FlowNode> nodes;
@@ -269,8 +289,6 @@ class ConnectionPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
-// -----------------------------------------------
-// زر حذف الاتصال
 class ConnectionDeleteButton extends StatelessWidget {
   final Connection connection;
   final FlowNode fromNode;
@@ -312,8 +330,6 @@ class ConnectionDeleteButton extends StatelessWidget {
   }
 }
 
-// -----------------------------------------------
-// شبكة الخلفية
 class GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

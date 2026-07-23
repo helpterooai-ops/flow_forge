@@ -16,27 +16,112 @@ class FlowNode {
   });
 }
 
-class NodeWidget extends StatelessWidget {
+class NodeWidget extends StatefulWidget {
   final FlowNode node;
   final void Function(Offset delta)? onDrag;
-  final VoidCallback? onTap;
+  final void Function(String newTitle)? onTitleChanged;
+  final VoidCallback? onDelete;
 
   const NodeWidget({
     super.key,
     required this.node,
     this.onDrag,
-    this.onTap,
+    this.onTitleChanged,
+    this.onDelete,
   });
+
+  @override
+  State<NodeWidget> createState() => _NodeWidgetState();
+}
+
+class _NodeWidgetState extends State<NodeWidget> {
+  bool _isEditing = false;
+  late TextEditingController _titleController;
+  late FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.node.title);
+    _focusNode = FocusNode();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (!_focusNode.hasFocus && _isEditing) {
+      _commitEdit();
+    }
+  }
+
+  void _commitEdit() {
+    final newTitle = _titleController.text.trim();
+    if (newTitle.isNotEmpty && newTitle != widget.node.title) {
+      widget.onTitleChanged?.call(newTitle);
+    }
+    setState(() {
+      _isEditing = false;
+    });
+  }
+
+  void _startEditing() {
+    setState(() {
+      _isEditing = true;
+      _titleController.text = widget.node.title; // reset to current title
+    });
+    _focusNode.requestFocus();
+  }
+
+  void _cancelEditing() {
+    setState(() {
+      _isEditing = false;
+    });
+    _titleController.text = widget.node.title; // restore original
+  }
 
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      left: node.position.dx,
-      top: node.position.dy,
+      left: widget.node.position.dx,
+      top: widget.node.position.dy,
       child: GestureDetector(
-        onTap: onTap,
+        onPanStart: (_) {
+          if (_isEditing) _cancelEditing();
+        },
         onPanUpdate: (details) {
-          onDrag?.call(details.delta);
+          widget.onDrag?.call(details.delta);
+        },
+        onTap: () {
+          if (!_isEditing) _startEditing();
+        },
+        onLongPress: () {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('حذف العقدة'),
+              content: const Text('هل تريد حذف هذه العقدة نهائياً؟'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('إلغاء')),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    widget.onDelete?.call();
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('حذف'),
+                ),
+              ],
+            ),
+          );
         },
         child: SizedBox(
           width: 200,
@@ -50,10 +135,10 @@ class NodeWidget extends StatelessWidget {
                   color: Colors.white.withOpacity(0.8),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                      color: node.color.withOpacity(0.4), width: 1),
+                      color: widget.node.color.withOpacity(0.4), width: 1),
                   boxShadow: [
                     BoxShadow(
-                      color: node.color.withOpacity(0.15),
+                      color: widget.node.color.withOpacity(0.15),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -68,30 +153,47 @@ class NodeWidget extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: node.color.withOpacity(0.15),
+                            color: widget.node.color.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(Icons.chat_bubble_outline_rounded,
-                              size: 18, color: node.color),
+                              size: 18, color: widget.node.color),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
-                            node.title,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: node.color,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          child: _isEditing
+                              ? TextField(
+                                  controller: _titleController,
+                                  focusNode: _focusNode,
+                                  autofocus: true,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: widget.node.color,
+                                  ),
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  onSubmitted: (_) => _commitEdit(),
+                                )
+                              : Text(
+                                  widget.node.title,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: widget.node.color,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                         ),
                       ],
                     ),
-                    if (node.subtitle.isNotEmpty) ...[
+                    if (widget.node.subtitle.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       Text(
-                        node.subtitle,
+                        widget.node.subtitle,
                         style: const TextStyle(
                             fontSize: 12, color: Color(0xFF64748B)),
                         maxLines: 3,
@@ -111,7 +213,7 @@ class NodeWidget extends StatelessWidget {
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: node.color,
+                      color: widget.node.color,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                       boxShadow: const [
@@ -133,7 +235,7 @@ class NodeWidget extends StatelessWidget {
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: node.color,
+                      color: widget.node.color,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                       boxShadow: const [
