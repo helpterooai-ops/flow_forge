@@ -19,11 +19,13 @@ class FlowNode {
 class NodeWidget extends StatelessWidget {
   final FlowNode node;
   final void Function(Offset delta)? onDrag;
+  final VoidCallback? onTap;
 
   const NodeWidget({
     super.key,
     required this.node,
     this.onDrag,
+    this.onTap,
   });
 
   @override
@@ -32,6 +34,7 @@ class NodeWidget extends StatelessWidget {
       left: node.position.dx,
       top: node.position.dy,
       child: GestureDetector(
+        onTap: onTap,
         onPanUpdate: (details) {
           onDrag?.call(details.delta);
         },
@@ -98,7 +101,7 @@ class NodeWidget extends StatelessWidget {
                   ],
                 ),
               ),
-              // نقطة يمنى (تجميل)
+              // نقاط التوصيل (تجميلية)
               Positioned(
                 right: -6,
                 top: 0,
@@ -121,7 +124,6 @@ class NodeWidget extends StatelessWidget {
                   ),
                 ),
               ),
-              // نقطة يسرى (تجميل)
               Positioned(
                 left: -6,
                 top: 0,

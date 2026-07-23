@@ -56,13 +56,55 @@ class _BuilderScreenState extends State<BuilderScreen> {
         _nodes[index].position += delta;
       }
     });
-    // بعد كل حركة، نفحص القرب ونوصل تلقائيًا
     _checkProximity(id);
+  }
+
+  void _editNode(String nodeId) {
+    final node = _nodes.firstWhere((n) => n.id == nodeId);
+    final titleController = TextEditingController(text: node.title);
+    final subtitleController = TextEditingController(text: node.subtitle);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تعديل العقدة'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(labelText: 'العنوان'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: subtitleController,
+              decoration: const InputDecoration(labelText: 'الوصف'),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                node.title = titleController.text;
+                node.subtitle = subtitleController.text;
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _addConnection(String fromId, String toId) {
     if (fromId == toId) return;
-    // منع التكرار (بأي اتجاه)
     final exists = _connections.any((c) =>
         (c.fromNodeId == fromId && c.toNodeId == toId) ||
         (c.fromNodeId == toId && c.toNodeId == fromId));
@@ -98,7 +140,6 @@ class _BuilderScreenState extends State<BuilderScreen> {
       final dist = (movedCenter - otherCenter).distance;
 
       if (dist < 150 && dist < minDist) {
-        // لم يتم توصيلهما بعد (بأي اتجاه)
         final alreadyConnected = _connections.any((c) =>
             (c.fromNodeId == movedNode.id && c.toNodeId == other.id) ||
             (c.fromNodeId == other.id && c.toNodeId == movedNode.id));
@@ -110,7 +151,6 @@ class _BuilderScreenState extends State<BuilderScreen> {
     }
 
     if (closestNode != null) {
-      // تحديد الاتجاه: العقدة اليسرى تصبح المصدر، والعقدة اليمنى الهدف
       final leftNode = movedNode.position.dx < closestNode.position.dx
           ? movedNode
           : closestNode;
@@ -178,10 +218,11 @@ class _BuilderScreenState extends State<BuilderScreen> {
                   onDelete: () => _deleteConnection(conn.id),
                 );
               }),
-              // العقد (قابلة للسحب)
+              // العقد (قابلة للسحب والنقر)
               ..._nodes.map((node) => NodeWidget(
                     node: node,
                     onDrag: (delta) => _onNodeMoved(node.id, delta),
+                    onTap: () => _editNode(node.id),
                   )),
             ],
           ),
@@ -192,7 +233,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
 }
 
 // -----------------------------------------------
-// رسام الخطوط (منحنيات بيزير)
+// رسام الخطوط
 class ConnectionPainter extends CustomPainter {
   final List<Connection> connections;
   final List<FlowNode> nodes;
@@ -205,10 +246,8 @@ class ConnectionPainter extends CustomPainter {
       final fromNode = nodes.firstWhere((n) => n.id == conn.fromNodeId);
       final toNode = nodes.firstWhere((n) => n.id == conn.toNodeId);
 
-      // نقطة البداية: مركز نقطة التوصيل اليمنى للعقدة المصدر
       final start = Offset(
           fromNode.position.dx + 200, fromNode.position.dy + 40);
-      // نقطة النهاية: مركز نقطة التوصيل اليسرى للعقدة الهدف
       final end = Offset(toNode.position.dx, toNode.position.dy + 40);
 
       final paint = Paint()
@@ -231,7 +270,7 @@ class ConnectionPainter extends CustomPainter {
 }
 
 // -----------------------------------------------
-// زر حذف الاتصال (يظهر في منتصف الخط)
+// زر حذف الاتصال
 class ConnectionDeleteButton extends StatelessWidget {
   final Connection connection;
   final FlowNode fromNode;
@@ -274,7 +313,7 @@ class ConnectionDeleteButton extends StatelessWidget {
 }
 
 // -----------------------------------------------
-// شبكة الخلفية (Dot Grid)
+// شبكة الخلفية
 class GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
