@@ -18,9 +18,19 @@ class _BuilderScreenState extends State<BuilderScreen> {
       _nodes.add(
         FlowNode(
           id: _uuid.v4(),
-          title: 'نص ترحيبي'
+          title: 'نص ترحيبي',
           subtitle: 'السلام عليكم! كيف أقدر أساعدك؟',
-          position: const Offset(200, 200),
+          position: Offset(
+            200 + (_nodes.length * 30) % 400,
+            200 + (_nodes.length * 40) % 300,
+          ),
+          color: [
+            const Color(0xFF5C6BC0),
+            const Color(0xFF26A69A),
+            const Color(0xFFEF5350),
+            const Color(0xFFFFA726),
+            const Color(0xFFAB47BC),
+          ][_nodes.length % 5],
         ),
       );
     });
@@ -32,10 +42,13 @@ class _BuilderScreenState extends State<BuilderScreen> {
       appBar: AppBar(
         title: const Text('محرر الخريطة'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'إضافة عقدة',
-            onPressed: _addNode,
+          Padding(
+            padding: const EdgeInsets.only(left: 8.0),
+            child: IconButton(
+              icon: const Icon(Icons.add_circle_rounded, size: 30),
+              tooltip: 'إضافة عقدة',
+              onPressed: _addNode,
+            ),
           ),
         ],
       ),
@@ -44,14 +57,35 @@ class _BuilderScreenState extends State<BuilderScreen> {
         boundaryMargin: const EdgeInsets.all(double.infinity),
         minScale: 0.1,
         maxScale: 2.0,
-        child: SizedBox(
-          width: 3000,
-          height: 3000,
-          child: Stack(
-            children: _nodes.map((node) => NodeWidget(node: node)).toList(),
-          ),
+        child: Stack(
+          children: [
+            CustomPaint(
+              size: const Size(3000, 3000),
+              painter: GridPainter(),
+            ),
+            ..._nodes.map((node) => NodeWidget(node: node)),
+          ],
         ),
       ),
     );
   }
+}
+
+class GridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFE0E0E0)
+      ..strokeWidth = 1;
+
+    const double spacing = 20.0;
+    for (double x = 0; x < size.width; x += spacing) {
+      for (double y = 0; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), 1.0, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
