@@ -26,10 +26,6 @@ class _BuilderScreenState extends State<BuilderScreen> {
   final List<Connection> _connections = [];
   final Uuid _uuid = const Uuid();
 
-  // متغيرات مؤقتة لرسم خط أثناء السحب
-  String? _draggingFromNodeId;
-  Offset? _dragEndPosition;
-
   void _addNode() {
     setState(() {
       _nodes.add(
@@ -62,53 +58,21 @@ class _BuilderScreenState extends State<BuilderScreen> {
     });
   }
 
-  // بدء السحب من نقطة توصيل (جهة اليمين)
-  void _onConnectorDragStart(String nodeId) {
-    setState(() {
-      _draggingFromNodeId = nodeId;
-      _dragEndPosition = _getConnectorPosition(nodeId, isRight: true);
-    });
-  }
-
-  // تحديث موضع المؤشر أثناء السحب
-  void _onConnectorDragUpdate(Offset delta) {
-    if (_draggingFromNodeId != null) {
+  void _addConnection(String fromId, String toId) {
+    // منع توصيل العقدة بنفسها أو التكرار
+    if (fromId == toId) return;
+    final exists = _connections.any(
+      (c) => c.fromNodeId == fromId && c.toNodeId == toId,
+    );
+    if (!exists) {
       setState(() {
-        _dragEndPosition = _dragEndPosition! + delta;
+        _connections.add(Connection(
+          id: _uuid.v4(),
+          fromNodeId: fromId,
+          toNodeId: toId,
+        ));
       });
     }
-  }
-
-  // إنهاء السحب: إذا انتهى فوق نقطة توصيل يسرى لعقدة أخرى، ننشئ اتصالاً
-  void _onConnectorDragEnd(String? targetNodeId) {
-    if (_draggingFromNodeId != null &&
-        targetNodeId != null &&
-        targetNodeId != _draggingFromNodeId) {
-      // تحقق من عدم وجود اتصال مكرر
-      final exists = _connections.any((c) =>
-          c.fromNodeId == _draggingFromNodeId && c.toNodeId == targetNodeId);
-      if (!exists) {
-        setState(() {
-          _connections.add(Connection(
-            id: _uuid.v4(),
-            fromNodeId: _draggingFromNodeId!,
-            toNodeId: targetNodeId,
-          ));
-        });
-      }
-    }
-    setState(() {
-      _draggingFromNodeId = null;
-      _dragEndPosition = null;
-    });
-  }
-
-  // حساب موضع نقطة توصيل معينة (يمين أو يسار العقدة)
-  Offset _getConnectorPosition(String nodeId, {required bool isRight}) {
-    final node = _nodes.firstWhere((n) => n.id == nodeId);
-    final x = isRight ? node.position.dx + 200 : node.position.dx;
-    final y = node.position.dy + 40; // نصف ارتفاع العقدة تقريباً
-    return Offset(x, y);
   }
 
   @override
@@ -142,12 +106,11 @@ class _BuilderScreenState extends State<BuilderScreen> {
           height: 3000,
           child: Stack(
             children: [
-              // شبكة الخلفية
               CustomPaint(
                 size: const Size(3000, 3000),
                 painter: GridPainter(),
               ),
-              // الخطوط الموجودة
+              // رسم الخطوط بين العقد
               CustomPaint(
                 size: const Size(3000, 3000),
                 painter: ConnectionPainter(
@@ -155,27 +118,11 @@ class _BuilderScreenState extends State<BuilderScreen> {
                   nodes: _nodes,
                 ),
               ),
-              // خط مؤقت أثناء السحب
-              if (_draggingFromNodeId != null && _dragEndPosition != null)
-                CustomPaint(
-                  size: const Size(3000, 3000),
-                  painter: TempLinePainter(
-                    start: _getConnectorPosition(_draggingFromNodeId!, isRight: true),
-                    end: _dragEndPosition!,
-                    color: _nodes.firstWhere((n) => n.id == _draggingFromNodeId).color,
-                  ),
-                ),
-              // العقد
+              // العقد مع دعم السحب والتوصيل
               ..._nodes.map((node) => NodeWidget(
                     node: node,
                     onDrag: (delta) => _onNodeMoved(node.id, delta),
-                    onConnectorDragStart: () => _onConnectorDragStart(node.id),
-                    onConnectorDragUpdate: _onConnectorDragUpdate,
-                    onConnectorDragEnd: (globalPosition) {
-                      // نبحث عن عقدة قريبة من نقطة الإفلات
-                      final target = _findNodeNear(globalPosition);
-                      _onConnectorDragEnd(target?.id);
-                    },
+                    onConnectionCreated: _addConnection,
                   )),
             ],
           ),
@@ -183,20 +130,9 @@ class _BuilderScreenState extends State<BuilderScreen> {
       ),
     );
   }
-
-  // يبحث عن عقدة يقع مركزها قريباً من نقطة معينة
-  FlowNode? _findNodeNear(Offset globalPos) {
-    for (final node in _nodes) {
-      final center = node.position + const Offset(100, 40);
-      if ((center - globalPos).distance < 50) {
-        return node;
-      }
-    }
-    return null;
-  }
 }
 
-// رسام الخطوط الدائمة
+// رسام الخطوط (منحنيات بيزير)
 class ConnectionPainter extends CustomPainter {
   final List<Connection> connections;
   final List<FlowNode> nodes;
@@ -208,42 +144,24 @@ class ConnectionPainter extends CustomPainter {
     for (final conn in connections) {
       final fromNode = nodes.firstWhere((n) => n.id == conn.fromNodeId);
       final toNode = nodes.firstWhere((n) => n.id == conn.toNodeId);
+
+      // نقطة البداية: مركز نقطة التوصيل اليمنى للعقدة المصدر
       final start = Offset(fromNode.position.dx + 200, fromNode.position.dy + 40);
+      // نقطة النهاية: مركز نقطة التوصيل اليسرى للعقدة الهدف
       final end = Offset(toNode.position.dx, toNode.position.dy + 40);
+
       final paint = Paint()
         ..color = fromNode.color.withOpacity(0.6)
         ..strokeWidth = 2.5
-        ..style = PaintingStyle.stroke;
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+
       final path = Path()
         ..moveTo(start.dx, start.dy)
         ..cubicTo(start.dx + 60, start.dy, end.dx - 60, end.dy, end.dx, end.dy);
+
       canvas.drawPath(path, paint);
     }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
-
-// رسام الخط المؤقت أثناء السحب
-class TempLinePainter extends CustomPainter {
-  final Offset start;
-  final Offset end;
-  final Color color;
-
-  TempLinePainter({required this.start, required this.end, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color.withOpacity(0.8)
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    final path = Path()
-      ..moveTo(start.dx, start.dy)
-      ..cubicTo(start.dx + 60, start.dy, end.dx - 60, end.dy, end.dx, end.dy);
-    canvas.drawPath(path, paint);
   }
 
   @override

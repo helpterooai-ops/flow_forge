@@ -16,38 +16,26 @@ class FlowNode {
   });
 }
 
-class NodeWidget extends StatefulWidget {
+class NodeWidget extends StatelessWidget {
   final FlowNode node;
   final void Function(Offset delta)? onDrag;
-  final VoidCallback? onConnectorDragStart;
-  final void Function(Offset delta)? onConnectorDragUpdate;
-  final void Function(Offset globalPosition)? onConnectorDragEnd;
+  final void Function(String fromId, String toId)? onConnectionCreated;
 
   const NodeWidget({
     super.key,
     required this.node,
     this.onDrag,
-    this.onConnectorDragStart,
-    this.onConnectorDragUpdate,
-    this.onConnectorDragEnd,
+    this.onConnectionCreated,
   });
-
-  @override
-  State<NodeWidget> createState() => _NodeWidgetState();
-}
-
-class _NodeWidgetState extends State<NodeWidget> {
-  // لحفظ نقطة البداية العامة (global) عند بدء السحب من نقطة التوصيل
-  Offset? _connectorStartGlobal;
 
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      left: widget.node.position.dx,
-      top: widget.node.position.dy,
+      left: node.position.dx,
+      top: node.position.dy,
       child: GestureDetector(
         onPanUpdate: (details) {
-          widget.onDrag?.call(details.delta);
+          onDrag?.call(details.delta);
         },
         child: SizedBox(
           width: 200,
@@ -61,10 +49,10 @@ class _NodeWidgetState extends State<NodeWidget> {
                   color: Colors.white.withOpacity(0.8),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                      color: widget.node.color.withOpacity(0.4), width: 1),
+                      color: node.color.withOpacity(0.4), width: 1),
                   boxShadow: [
                     BoxShadow(
-                      color: widget.node.color.withOpacity(0.15),
+                      color: node.color.withOpacity(0.15),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -79,30 +67,30 @@ class _NodeWidgetState extends State<NodeWidget> {
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: widget.node.color.withOpacity(0.15),
+                            color: node.color.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(Icons.chat_bubble_outline_rounded,
-                              size: 18, color: widget.node.color),
+                              size: 18, color: node.color),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            widget.node.title,
+                            node.title,
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
-                              color: widget.node.color,
+                              color: node.color,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
-                    if (widget.node.subtitle.isNotEmpty) ...[
+                    if (node.subtitle.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       Text(
-                        widget.node.subtitle,
+                        node.subtitle,
                         style: const TextStyle(
                             fontSize: 12, color: Color(0xFF64748B)),
                         maxLines: 3,
@@ -112,35 +100,40 @@ class _NodeWidgetState extends State<NodeWidget> {
                   ],
                 ),
               ),
-              // نقطة التوصيل اليمنى (قابلة للسحب)
+              // نقطة التوصيل اليمنى (قابلة للسحب - Draggable)
               Positioned(
                 right: -6,
                 top: 0,
                 bottom: 0,
-                child: GestureDetector(
-                  onPanStart: (_) {
-                    widget.onConnectorDragStart?.call();
-                    // نحفظ الإحداثيات العامة عند بدء السحب (لإستخدامها لاحقاً)
-                    final renderBox = context.findRenderObject() as RenderBox?;
-                    if (renderBox != null) {
-                      // نأخذ إحداثيات مركز نقطة التوصيل اليمنى بالنسبة للعالم (global)
-                      final connectorCenter = renderBox.localToGlobal(
-                          Offset(renderBox.size.width + 6, renderBox.size.height / 2));
-                      _connectorStartGlobal = connectorCenter;
-                    }
-                  },
-                  onPanUpdate: (details) {
-                    widget.onConnectorDragUpdate?.call(details.delta);
-                  },
-                  onPanEnd: (_) {
-                    widget.onConnectorDragEnd?.call(_connectorStartGlobal ?? Offset.zero);
-                    _connectorStartGlobal = null;
-                  },
+                child: Draggable<String>(
+                  data: node.id, // نحمل معرف العقدة المصدر
+                  feedback: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: node.color,
+                        shape: BoxShape.circle,
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black38, blurRadius: 4),
+                        ],
+                      ),
+                    ),
+                  ),
+                  childWhenDragging: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: const BoxDecoration(
+                      color: Colors.grey,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                   child: Container(
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: widget.node.color,
+                      color: node.color,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                       boxShadow: const [
@@ -153,27 +146,40 @@ class _NodeWidgetState extends State<NodeWidget> {
                   ),
                 ),
               ),
-              // نقطة التوصيل اليسرى (ثابتة)
+              // نقطة التوصيل اليسرى (مستقبلة - DragTarget)
               Positioned(
                 left: -6,
                 top: 0,
                 bottom: 0,
-                child: Center(
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: widget.node.color,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: const [
-                        BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 4,
-                            offset: Offset(0, 2)),
-                      ],
-                    ),
-                  ),
+                child: DragTarget<String>(
+                  onAcceptWithDetails: (details) {
+                    // تم إسقاط عقدة مصدر فوق هذه النقطة
+                    final fromId = details.data;
+                    final toId = node.id;
+                    if (fromId != toId) {
+                      onConnectionCreated?.call(fromId, toId);
+                    }
+                  },
+                  builder: (context, candidateData, rejectedData) {
+                    // تغيير اللون عند وجود عنصر فوقه
+                    final isHovering = candidateData.isNotEmpty;
+                    return Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: isHovering ? node.color : node.color.withOpacity(0.7),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: isHovering ? Colors.yellow : Colors.white, width: 2),
+                        boxShadow: const [
+                          BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 4,
+                              offset: Offset(0, 2)),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
