@@ -20,7 +20,10 @@ class _BuilderScreenState extends State<BuilderScreen> {
           id: _uuid.v4(),
           title: 'رسالة ترحيب',
           subtitle: 'مرحباً بك! كيف يمكنني مساعدتك اليوم؟',
-          position: Offset(250 + (_nodes.length * 20) % 200, 250 + (_nodes.length * 30) % 200),
+          position: Offset(
+            250 + (_nodes.length * 20) % 200,
+            250 + (_nodes.length * 30) % 200,
+          ),
           color: [
             const Color(0xFF6366F1),
             const Color(0xFF0EA5E9),
