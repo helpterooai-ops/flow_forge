@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:iconsax/iconsax.dart';
 
 enum NodeType { message, question, action, condition }
 
@@ -91,17 +91,17 @@ class _NodeWidgetState extends State<NodeWidget> {
     _titleController.text = widget.node.title;
   }
 
-  // استخدام فوسفور ديوطون – مظهر حديث جداً
-  PhosphorIconData _iconForType(NodeType type) {
+  // أيقونات Iconsax الحديثة جداً
+  IconData _iconForType(NodeType type) {
     switch (type) {
       case NodeType.message:
-        return PhosphorIconsDuotone.chatCenteredDots; // فقاعة محادثة بنقاط
+        return Iconsax.message;              // فقاعة رسالة
       case NodeType.question:
-        return PhosphorIconsDuotone.question; // دائرة بها علامة سؤال
+        return Iconsax.message_question;      // فقاعة مع سؤال
       case NodeType.action:
-        return PhosphorIconsDuotone.gearFine; // ترس (إجراء)
+        return Iconsax.setting_2;             // ترس حديث
       case NodeType.condition:
-        return PhosphorIconsDuotone.gitFork; // تفرع (شرط)
+        return Iconsax.arrow_3;               // تفرع
     }
   }
 
@@ -174,11 +174,8 @@ class _NodeWidgetState extends State<NodeWidget> {
                             color: widget.node.color.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: PhosphorIcon(
-                            _iconForType(widget.node.type),
-                            size: 18,
-                            color: widget.node.color,
-                          ),
+                          child: Icon(_iconForType(widget.node.type),
+                              size: 18, color: widget.node.color),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -224,7 +221,6 @@ class _NodeWidgetState extends State<NodeWidget> {
                   ],
                 ),
               ),
-              // نقاط التوصيل
               Positioned(
                 right: -6,
                 top: 0,
