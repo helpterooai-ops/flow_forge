@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:iconsax/iconsax.dart';
 import '../widgets/node_widget.dart';
@@ -33,6 +34,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
   final List<FlowNode> _nodes = [];
   final List<Connection> _connections = [];
   final Uuid _uuid = const Uuid();
+  bool _isPublishing = false;
 
   void _showAddNodeDialog() {
     NodeType? selectedType;
@@ -110,7 +112,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
       case NodeType.input:
         return Iconsax.text_block;
       case NodeType.intent:
-        return Icons.psychology_rounded;   // تم التصحيح
+        return Icons.psychology_rounded;
     }
   }
 
@@ -174,6 +176,68 @@ class _BuilderScreenState extends State<BuilderScreen> {
     setState(() {
       _connections.removeWhere((c) => c.id == connId);
     });
+  }
+
+  // ✅ دالة النشر إلى الخادم
+  Future<void> _publishMap() async {
+    if (_isPublishing) return;
+
+    setState(() => _isPublishing = true);
+
+    final map = {
+      'nodes': _nodes
+          .map((n) => {
+                'id': n.id,
+                'type': n.type.name,
+                'title': n.title,
+                'subtitle': n.subtitle,
+                'color': n.color.value.toRadixString(16),
+                'x': n.position.dx,
+                'y': n.position.dy,
+                'variableName': n.variableName,
+                'prompt': n.prompt,
+                'isPaused': n.isPaused,
+                'fallbackNodeId': n.fallbackNodeId,
+              })
+          .toList(),
+      'connections': _connections.map((c) => c.toJson()).toList(),
+    };
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://flow-forge-server.vercel.app/api/v1/maps/test'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(map),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ تم نشر الخريطة بنجاح! البوت جاهز الآن.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ فشل النشر (${response.statusCode}): ${response.body}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ خطأ في الاتصال: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isPublishing = false);
+    }
   }
 
   void _exportJSON() {
@@ -263,13 +327,33 @@ class _BuilderScreenState extends State<BuilderScreen> {
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
+                color: _isPublishing ? Colors.grey : const Color(0xFF6366F1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: _isPublishing
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.cloud_upload_rounded,
+                      color: Colors.white, size: 24),
+            ),
+            tooltip: 'نشر إلى البوت',
+            onPressed: _isPublishing ? null : _publishMap,
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
                 color: const Color(0xFF6366F1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.save_alt_rounded,
                   color: Colors.white, size: 24),
             ),
-            tooltip: 'تصدير الخريطة',
+            tooltip: 'تصدير JSON',
             onPressed: _exportJSON,
           ),
           const SizedBox(width: 4),
@@ -280,7 +364,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
                 color: const Color(0xFF6366F1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+              child:
+                  const Icon(Icons.add_rounded, color: Colors.white, size: 24),
             ),
             tooltip: 'إضافة عقدة',
             onPressed: _showAddNodeDialog,
@@ -310,7 +395,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
                 ),
               ),
               ..._connections.map((conn) {
-                final from = _nodes.firstWhere((n) => n.id == conn.fromNodeId);
+                final from =
+                    _nodes.firstWhere((n) => n.id == conn.fromNodeId);
                 final to = _nodes.firstWhere((n) => n.id == conn.toNodeId);
                 return ConnectionDeleteButton(
                   connection: conn,
