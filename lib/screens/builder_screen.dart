@@ -9,17 +9,20 @@ class Connection {
   final String id;
   final String fromNodeId;
   final String toNodeId;
+  String? condition; // ✅ شرط الانتقال (للاستخدام مع intent)
 
   Connection({
     required this.id,
     required this.fromNodeId,
     required this.toNodeId,
+    this.condition,
   });
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'from': fromNodeId,
         'to': toNodeId,
+        if (condition != null) 'condition': condition,
       };
 }
 
@@ -156,7 +159,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
     });
   }
 
-  void _addConnection(String fromId, String toId) {
+  // ✅ توصيل مع إمكانية إضافة شرط
+  void _addConnectionWithCondition(String fromId, String toId, String? condition) {
     if (fromId == toId) return;
     final exists = _connections.any((c) =>
         (c.fromNodeId == fromId && c.toNodeId == toId) ||
@@ -167,6 +171,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
           id: _uuid.v4(),
           fromNodeId: fromId,
           toNodeId: toId,
+          condition: condition,
         ));
       });
     }
@@ -178,10 +183,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
     });
   }
 
-  // ✅ دالة النشر إلى الخادم
   Future<void> _publishMap() async {
     if (_isPublishing) return;
-
     setState(() => _isPublishing = true);
 
     final map = {
@@ -209,9 +212,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(map),
       );
-
       if (!mounted) return;
-
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -313,8 +314,51 @@ class _BuilderScreenState extends State<BuilderScreen> {
       final rightNode = movedNode.position.dx < closestNode.position.dx
           ? closestNode
           : movedNode;
-      _addConnection(leftNode.id, rightNode.id);
+
+      // ✅ إذا كانت العقدة المصدر (اليسرى) من نوع intent، نطلب إدخال شرط
+      if (leftNode.type == NodeType.intent) {
+        _showConditionDialog(leftNode.id, rightNode.id);
+      } else {
+        _addConnectionWithCondition(leftNode.id, rightNode.id, null);
+      }
     }
+  }
+
+  // ✅ مربع حوار لإدخال شرط التوصيل
+  void _showConditionDialog(String fromId, String toId) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('شرط الانتقال'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'مثلاً: طلب مساعدة، شكوى...',
+            labelText: 'الكلمة أو العبارة المطلوبة',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final condition = controller.text.trim();
+              if (condition.isNotEmpty) {
+                _addConnectionWithCondition(fromId, toId, condition);
+              } else {
+                // إذا لم يُدخل شرطاً، نضيف الاتصال بدون شرط
+                _addConnectionWithCondition(fromId, toId, null);
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('موافق'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
