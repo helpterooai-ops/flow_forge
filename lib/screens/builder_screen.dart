@@ -1,9 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:iconsax/iconsax.dart';
 import '../widgets/node_widget.dart';
+import '../widgets/side_menu.dart';
 
 class Connection {
   final String id;
@@ -24,10 +28,19 @@ class Connection {
         'to': toNodeId,
         if (condition != null) 'condition': condition,
       };
+
+  factory Connection.fromJson(Map<String, dynamic> json) => Connection(
+        id: json['id'],
+        fromNodeId: json['from'],
+        toNodeId: json['to'],
+        condition: json['condition'],
+      );
 }
 
 class BuilderScreen extends StatefulWidget {
-  const BuilderScreen({super.key});
+  final SavedMap? savedMap;
+
+  const BuilderScreen({super.key, this.savedMap});
 
   @override
   State<BuilderScreen> createState() => _BuilderScreenState();
@@ -38,6 +51,198 @@ class _BuilderScreenState extends State<BuilderScreen> {
   final List<Connection> _connections = [];
   final Uuid _uuid = const Uuid();
   bool _isPublishing = false;
+  bool _hasUnsavedChanges = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.savedMap != null) {
+      _loadFromSavedMap();
+    } else {
+      _loadFromLocal();
+    }
+  }
+
+  void _loadFromSavedMap() {
+    final data = jsonDecode(widget.savedMap!.jsonData);
+    setState(() {
+      _nodes.clear();
+      _connections.clear();
+      for (final n in data['nodes']) {
+        _nodes.add(FlowNode(
+          id: n['id'],
+          title: n['title'],
+          subtitle: n['subtitle'] ?? '',
+          position: Offset((n['x'] ?? 0).toDouble(), (n['y'] ?? 0).toDouble()),
+          color: Color(int.parse(n['color'] ?? 'ff6366f1', radix: 16)),
+          type: NodeType.values.firstWhere((e) => e.name == n['type']),
+          variableName: n['variableName'] ?? '',
+          prompt: n['prompt'] ?? '',
+          isPaused: n['isPaused'] ?? false,
+          fallbackNodeId: n['fallbackNodeId'],
+        ));
+      }
+      for (final c in data['connections']) {
+        _connections.add(Connection.fromJson(c));
+      }
+    });
+    setState(() {
+      _isLoading = false;
+      _hasUnsavedChanges = false;
+    });
+  }
+
+  Future<String> get _localPath async {
+    final dir = await getApplicationDocumentsDirectory();
+    return '${dir.path}/flowforge_current_map.json';
+  }
+
+  Future<void> _loadFromLocal() async {
+    try {
+      final file = File(await _localPath);
+      if (await file.exists()) {
+        final contents = await file.readAsString();
+        final data = jsonDecode(contents);
+        setState(() {
+          _nodes.clear();
+          _connections.clear();
+          for (final n in data['nodes']) {
+            _nodes.add(FlowNode(
+              id: n['id'],
+              title: n['title'],
+              subtitle: n['subtitle'] ?? '',
+              position: Offset((n['x'] ?? 0).toDouble(), (n['y'] ?? 0).toDouble()),
+              color: Color(int.parse(n['color'] ?? 'ff6366f1', radix: 16)),
+              type: NodeType.values.firstWhere((e) => e.name == n['type']),
+              variableName: n['variableName'] ?? '',
+              prompt: n['prompt'] ?? '',
+              isPaused: n['isPaused'] ?? false,
+              fallbackNodeId: n['fallbackNodeId'],
+            ));
+          }
+          for (final c in data['connections']) {
+            _connections.add(Connection.fromJson(c));
+          }
+        });
+      }
+    } catch (_) {}
+    setState(() {
+      _isLoading = false;
+      _hasUnsavedChanges = false;
+    });
+  }
+
+  Future<void> _saveToLocal() async {
+    final map = {
+      'nodes': _nodes
+          .map((n) => {
+                'id': n.id,
+                'type': n.type.name,
+                'title': n.title,
+                'subtitle': n.subtitle,
+                'color': n.color.value.toRadixString(16),
+                'x': n.position.dx,
+                'y': n.position.dy,
+                'variableName': n.variableName,
+                'prompt': n.prompt,
+                'isPaused': n.isPaused,
+                'fallbackNodeId': n.fallbackNodeId,
+              })
+          .toList(),
+      'connections': _connections.map((c) => c.toJson()).toList(),
+    };
+    final file = File(await _localPath);
+    await file.writeAsString(jsonEncode(map));
+    setState(() => _hasUnsavedChanges = false);
+  }
+
+  Future<void> _saveToSideMenu() async {
+    final map = {
+      'nodes': _nodes
+          .map((n) => {
+                'id': n.id,
+                'type': n.type.name,
+                'title': n.title,
+                'subtitle': n.subtitle,
+                'color': n.color.value.toRadixString(16),
+                'x': n.position.dx,
+                'y': n.position.dy,
+                'variableName': n.variableName,
+                'prompt': n.prompt,
+                'isPaused': n.isPaused,
+                'fallbackNodeId': n.fallbackNodeId,
+              })
+          .toList(),
+      'connections': _connections.map((c) => c.toJson()).toList(),
+    };
+    final jsonData = jsonEncode(map);
+    final mapId = widget.savedMap?.id ?? _uuid.v4();
+    final mapName = widget.savedMap?.name ?? 'خريطة ${DateTime.now().millisecondsSinceEpoch}';
+
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString('saved_maps');
+    List<SavedMap> maps = [];
+    if (data != null) {
+      maps = (jsonDecode(data) as List).map((e) => SavedMap.fromJson(e)).toList();
+    }
+
+    final index = maps.indexWhere((m) => m.id == mapId);
+    final newMap = SavedMap(id: mapId, name: mapName, jsonData: jsonData);
+    if (index != -1) {
+      maps[index] = newMap;
+    } else {
+      maps.add(newMap);
+    }
+
+    await prefs.setString('saved_maps', jsonEncode(maps.map((m) => m.toJson()).toList()));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ تم حفظ الخريطة في القائمة الجانبية'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  void _markChanged() {
+    if (!_hasUnsavedChanges) {
+      setState(() => _hasUnsavedChanges = true);
+    }
+  }
+
+  Future<bool> _onWillPop() async {
+    if (!_hasUnsavedChanges) return true;
+    final action = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حفظ التغييرات؟'),
+        content: const Text('لديك تغييرات غير محفوظة. ماذا تريد أن تفعل؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'ignore'),
+            child: const Text('تجاهل'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'cancel'),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, 'save'),
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+    if (action == 'save') {
+      await _saveToLocal();
+      return true;
+    } else if (action == 'ignore') {
+      return true;
+    }
+    return false;
+  }
 
   void _showAddNodeDialog() {
     NodeType? selectedType;
@@ -121,24 +326,23 @@ class _BuilderScreenState extends State<BuilderScreen> {
 
   void _addNode(NodeType type) {
     setState(() {
-      _nodes.add(
-        FlowNode(
-          id: _uuid.v4(),
-          title: _labelForType(type),
-          subtitle: 'انقر للكتابة...',
-          position: Offset(
-            250 + (_nodes.length * 20) % 200,
-            250 + (_nodes.length * 30) % 200,
-          ),
-          color: _colorForType(type),
-          type: type,
-          variableName: type == NodeType.input ? 'input_${_nodes.length}' : '',
-          prompt: type == NodeType.input ? 'أدخل القيمة هنا' : '',
-          isPaused: false,
-          fallbackNodeId: null,
+      _nodes.add(FlowNode(
+        id: _uuid.v4(),
+        title: _labelForType(type),
+        subtitle: 'انقر للكتابة...',
+        position: Offset(
+          250 + (_nodes.length * 20) % 200,
+          250 + (_nodes.length * 30) % 200,
         ),
-      );
+        color: _colorForType(type),
+        type: type,
+        variableName: type == NodeType.input ? 'input_${_nodes.length}' : '',
+        prompt: type == NodeType.input ? 'أدخل القيمة هنا' : '',
+        isPaused: false,
+        fallbackNodeId: null,
+      ));
     });
+    _markChanged();
   }
 
   void _onNodeMoved(String id, Offset delta) {
@@ -148,6 +352,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
         _nodes[index].position += delta;
       }
     });
+    _markChanged();
     _checkProximity(id);
   }
 
@@ -157,9 +362,11 @@ class _BuilderScreenState extends State<BuilderScreen> {
       _connections.removeWhere(
           (c) => c.fromNodeId == nodeId || c.toNodeId == nodeId);
     });
+    _markChanged();
   }
 
-  void _addConnectionWithCondition(String fromId, String toId, String? condition) {
+  void _addConnectionWithCondition(
+      String fromId, String toId, String? condition) {
     if (fromId == toId) return;
     final exists = _connections.any((c) =>
         (c.fromNodeId == fromId && c.toNodeId == toId) ||
@@ -173,6 +380,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
           condition: condition,
         ));
       });
+      _markChanged();
     }
   }
 
@@ -180,6 +388,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
     setState(() {
       _connections.removeWhere((c) => c.id == connId);
     });
+    _markChanged();
   }
 
   Future<void> _publishMap() async {
@@ -222,7 +431,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ فشل النشر (${response.statusCode}): ${response.body}'),
+            content:
+                Text('❌ فشل النشر (${response.statusCode}): ${response.body}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -343,7 +553,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
           ElevatedButton(
             onPressed: () {
               final condition = controller.text.trim();
-              _addConnectionWithCondition(fromId, toId, condition.isNotEmpty ? condition : null);
+              _addConnectionWithCondition(
+                  fromId, toId, condition.isNotEmpty ? condition : null);
               Navigator.pop(ctx);
             },
             child: const Text('موافق'),
@@ -355,118 +566,155 @@ class _BuilderScreenState extends State<BuilderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('محرر الخريطة'),
-        actions: [
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: _isPublishing ? Colors.grey : const Color(0xFF6366F1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: _isPublishing
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.cloud_upload_rounded,
-                      color: Colors.white, size: 24),
-            ),
-            tooltip: 'نشر إلى البوت',
-            onPressed: _isPublishing ? null : _publishMap,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldPop = await _onWillPop();
+        if (shouldPop && mounted) Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('محرر الخريطة'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              final shouldPop = await _onWillPop();
+              if (shouldPop && mounted) Navigator.of(context).pop();
+            },
           ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF6366F1),
-                borderRadius: BorderRadius.circular(12),
+          actions: [
+            IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6366F1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child:
+                    const Icon(Icons.save, color: Colors.white, size: 24),
               ),
-              child: const Icon(Icons.save_alt_rounded,
-                  color: Colors.white, size: 24),
+              tooltip: 'حفظ في القائمة الجانبية',
+              onPressed: _saveToSideMenu,
             ),
-            tooltip: 'تصدير JSON',
-            onPressed: _exportJSON,
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF6366F1),
-                borderRadius: BorderRadius.circular(12),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _isPublishing ? Colors.grey : const Color(0xFF6366F1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: _isPublishing
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.cloud_upload_rounded,
+                        color: Colors.white, size: 24),
               ),
-              child:
-                  const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+              tooltip: 'نشر إلى البوت',
+              onPressed: _isPublishing ? null : _publishMap,
             ),
-            tooltip: 'إضافة عقدة',
-            onPressed: _showAddNodeDialog,
-          ),
-          const SizedBox(width: 12),
-        ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(30),
-          child: ColoredBox(
-            color: Color(0xFFF1F5F9),
-            child: Center(
-              child: Text(
-                '⬅️ تدفق المحادثة: من اليسار إلى اليمين',
-                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6366F1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.save_alt_rounded,
+                    color: Colors.white, size: 24),
               ),
+              tooltip: 'تصدير JSON',
+              onPressed: _exportJSON,
             ),
-          ),
-        ),
-      ),
-      body: InteractiveViewer(
-        constrained: false,
-        boundaryMargin: const EdgeInsets.all(double.infinity),
-        minScale: 0.1,
-        maxScale: 2.0,
-        child: SizedBox(
-          width: 3000,
-          height: 3000,
-          child: Stack(
-            children: [
-              CustomPaint(
-                size: const Size(3000, 3000),
-                painter: GridPainter(),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6366F1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.add_rounded,
+                    color: Colors.white, size: 24),
               ),
-              CustomPaint(
-                size: const Size(3000, 3000),
-                painter: ConnectionPainter(
-                  connections: _connections,
-                  nodes: _nodes,
+              tooltip: 'إضافة عقدة',
+              onPressed: _showAddNodeDialog,
+            ),
+            const SizedBox(width: 12),
+          ],
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(30),
+            child: ColoredBox(
+              color: Color(0xFFF1F5F9),
+              child: Center(
+                child: Text(
+                  '⬅️ تدفق المحادثة: من اليسار إلى اليمين',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                 ),
               ),
-              ..._connections.map((conn) {
-                final from =
-                    _nodes.firstWhere((n) => n.id == conn.fromNodeId);
-                final to = _nodes.firstWhere((n) => n.id == conn.toNodeId);
-                return ConnectionDeleteButton(
-                  connection: conn,
-                  fromNode: from,
-                  toNode: to,
-                  onDelete: () => _deleteConnection(conn.id),
-                );
-              }),
-              ..._nodes.map((node) => NodeWidget(
-                    node: node,
-                    onDrag: (delta) => _onNodeMoved(node.id, delta),
-                    onTitleChanged: (newTitle) {
-                      setState(() {
-                        node.title = newTitle;
-                      });
-                    },
-                    onDelete: () => _deleteNode(node.id),
-                    onPropertiesChanged: () => setState(() {}),
-                  )),
-            ],
+            ),
           ),
         ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : InteractiveViewer(
+                constrained: false,
+                boundaryMargin: const EdgeInsets.all(double.infinity),
+                minScale: 0.1,
+                maxScale: 2.0,
+                child: SizedBox(
+                  width: 3000,
+                  height: 3000,
+                  child: Stack(
+                    children: [
+                      CustomPaint(
+                        size: const Size(3000, 3000),
+                        painter: GridPainter(),
+                      ),
+                      CustomPaint(
+                        size: const Size(3000, 3000),
+                        painter: ConnectionPainter(
+                          connections: _connections,
+                          nodes: _nodes,
+                        ),
+                      ),
+                      ..._connections.map((conn) {
+                        final from = _nodes
+                            .firstWhere((n) => n.id == conn.fromNodeId);
+                        final to = _nodes
+                            .firstWhere((n) => n.id == conn.toNodeId);
+                        return ConnectionDeleteButton(
+                          connection: conn,
+                          fromNode: from,
+                          toNode: to,
+                          onDelete: () => _deleteConnection(conn.id),
+                        );
+                      }),
+                      ..._nodes.map((node) => NodeWidget(
+                            node: node,
+                            onDrag: (delta) =>
+                                _onNodeMoved(node.id, delta),
+                            onTitleChanged: (newTitle) {
+                              setState(() {
+                                node.title = newTitle;
+                              });
+                              _markChanged();
+                            },
+                            onDelete: () => _deleteNode(node.id),
+                            onPropertiesChanged: () {
+                              setState(() {});
+                              _markChanged();
+                            },
+                          )),
+                    ],
+                  ),
+                ),
+              ),
       ),
     );
   }

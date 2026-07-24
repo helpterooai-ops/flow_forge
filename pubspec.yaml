@@ -12,6 +12,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   uuid: ^4.0.0
   http: ^1.1.0
+  path_provider: ^2.1.0
+  shared_preferences: ^2.2.0
   iconsax: ^0.0.8
 
 dev_dependencies:
