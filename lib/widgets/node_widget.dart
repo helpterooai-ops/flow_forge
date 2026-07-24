@@ -11,11 +11,11 @@ class FlowNode {
   Color color;
   NodeType type;
 
-  // الحقول الجديدة
-  String variableName;   // اسم المتغير (للاستخدام مع input)
-  String prompt;         // السؤال الذي يُعرض على العميل
-  bool isPaused;         // تحويل بشري
-  String? fallbackNodeId; // عقدة احتياطية
+  // حقول إضافية
+  String variableName;
+  String prompt;
+  bool isPaused;
+  String? fallbackNodeId;
 
   FlowNode({
     required this.id,
@@ -36,6 +36,7 @@ class NodeWidget extends StatefulWidget {
   final void Function(Offset delta)? onDrag;
   final void Function(String newTitle)? onTitleChanged;
   final VoidCallback? onDelete;
+  final VoidCallback? onPropertiesChanged;
 
   const NodeWidget({
     super.key,
@@ -43,6 +44,7 @@ class NodeWidget extends StatefulWidget {
     this.onDrag,
     this.onTitleChanged,
     this.onDelete,
+    this.onPropertiesChanged,
   });
 
   @override
@@ -114,8 +116,61 @@ class _NodeWidgetState extends State<NodeWidget> {
       case NodeType.input:
         return Iconsax.text_block;
       case NodeType.intent:
-        return Icons.psychology_rounded;   // تم التصحيح
+        return Icons.psychology_rounded;
     }
+  }
+
+  void _showPropertiesDialog(BuildContext context) {
+    final titleCtrl = TextEditingController(text: widget.node.title);
+    final promptCtrl = TextEditingController(text: widget.node.prompt);
+    final varCtrl = TextEditingController(text: widget.node.variableName);
+    final isInputType = widget.node.type == NodeType.input || widget.node.type == NodeType.intent;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('خصائص العقدة'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'العنوان')),
+              const SizedBox(height: 12),
+              TextField(controller: promptCtrl, decoration: const InputDecoration(labelText: 'النص الإرشادي (Prompt)')),
+              if (isInputType) ...[
+                const SizedBox(height: 12),
+                TextField(controller: varCtrl, decoration: const InputDecoration(labelText: 'اسم المتغير')),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              widget.onDelete?.call();
+            },
+            child: const Text('حذف العقدة', style: TextStyle(color: Colors.red)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              widget.node.title = titleCtrl.text;
+              widget.node.prompt = promptCtrl.text;
+              if (isInputType) {
+                widget.node.variableName = varCtrl.text;
+              }
+              widget.onPropertiesChanged?.call();
+              Navigator.pop(ctx);
+            },
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -134,26 +189,7 @@ class _NodeWidgetState extends State<NodeWidget> {
           if (!_isEditing) _startEditing();
         },
         onLongPress: () {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('حذف العقدة'),
-              content: const Text('هل تريد حذف هذه العقدة نهائياً؟'),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('إلغاء')),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    widget.onDelete?.call();
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                  child: const Text('حذف'),
-                ),
-              ],
-            ),
-          );
+          _showPropertiesDialog(context);
         },
         child: SizedBox(
           width: 200,

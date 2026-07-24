@@ -9,7 +9,7 @@ class Connection {
   final String id;
   final String fromNodeId;
   final String toNodeId;
-  String? condition; // ✅ شرط الانتقال (للاستخدام مع intent)
+  String? condition;
 
   Connection({
     required this.id,
@@ -159,7 +159,6 @@ class _BuilderScreenState extends State<BuilderScreen> {
     });
   }
 
-  // ✅ توصيل مع إمكانية إضافة شرط
   void _addConnectionWithCondition(String fromId, String toId, String? condition) {
     if (fromId == toId) return;
     final exists = _connections.any((c) =>
@@ -315,7 +314,6 @@ class _BuilderScreenState extends State<BuilderScreen> {
           ? closestNode
           : movedNode;
 
-      // ✅ إذا كانت العقدة المصدر (اليسرى) من نوع intent، نطلب إدخال شرط
       if (leftNode.type == NodeType.intent) {
         _showConditionDialog(leftNode.id, rightNode.id);
       } else {
@@ -324,7 +322,6 @@ class _BuilderScreenState extends State<BuilderScreen> {
     }
   }
 
-  // ✅ مربع حوار لإدخال شرط التوصيل
   void _showConditionDialog(String fromId, String toId) {
     final controller = TextEditingController();
     showDialog(
@@ -346,12 +343,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
           ElevatedButton(
             onPressed: () {
               final condition = controller.text.trim();
-              if (condition.isNotEmpty) {
-                _addConnectionWithCondition(fromId, toId, condition);
-              } else {
-                // إذا لم يُدخل شرطاً، نضيف الاتصال بدون شرط
-                _addConnectionWithCondition(fromId, toId, null);
-              }
+              _addConnectionWithCondition(fromId, toId, condition.isNotEmpty ? condition : null);
               Navigator.pop(ctx);
             },
             child: const Text('موافق'),
@@ -416,6 +408,18 @@ class _BuilderScreenState extends State<BuilderScreen> {
           ),
           const SizedBox(width: 12),
         ],
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(30),
+          child: ColoredBox(
+            color: Color(0xFFF1F5F9),
+            child: Center(
+              child: Text(
+                '⬅️ تدفق المحادثة: من اليسار إلى اليمين',
+                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              ),
+            ),
+          ),
+        ),
       ),
       body: InteractiveViewer(
         constrained: false,
@@ -458,6 +462,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
                       });
                     },
                     onDelete: () => _deleteNode(node.id),
+                    onPropertiesChanged: () => setState(() {}),
                   )),
             ],
           ),
