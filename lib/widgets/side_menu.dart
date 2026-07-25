@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import '../screens/saved_maps_screen.dart';
 import '../screens/settings_screen.dart';
+import '../screens/hosting_screen.dart';   // <-- أضف هذا الاستيراد
 import 'toast_widget.dart';
 
 class SideMenu extends StatelessWidget {
@@ -92,6 +93,19 @@ class SideMenu extends StatelessWidget {
                       AppToast.show(context, 'قريباً...');
                     },
                   ),
+                  // ------------------- عنصر الاستضافة الجديد -------------------
+                  _MenuItem(
+                    icon: Iconsax.global,
+                    title: 'الاستضافة',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const HostingScreen()),
+                      );
+                    },
+                  ),
+                  // ---------------------------------------------------------------
                   _MenuItem(
                     icon: Iconsax.setting_2,
                     title: 'الإعدادات',
