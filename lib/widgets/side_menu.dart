@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/saved_map.dart';
 import '../screens/saved_maps_screen.dart';
 
 class SideMenu extends StatelessWidget {

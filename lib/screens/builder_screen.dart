@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:iconsax/iconsax.dart';
 import '../widgets/node_widget.dart';
-import '../widgets/side_menu.dart';
+import '../models/saved_map.dart';
 
 class Connection {
   final String id;
