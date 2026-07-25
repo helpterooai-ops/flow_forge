@@ -311,7 +311,7 @@ class _BuilderScreenState extends State<BuilderScreen>
     _updateWrongConnections();
   }
 
-  // --------------------- تحديث حالة التحذير ---------------------
+  // --------------------- تحديث حالة التحذير (معكوس) ---------------------
   void _updateWrongConnections() {
     final wrongConnections = <String>{};
     final wrongNodes = <String, bool>{};
@@ -319,7 +319,9 @@ class _BuilderScreenState extends State<BuilderScreen>
     for (final conn in _connections) {
       final fromNode = _nodes.firstWhere((n) => n.id == conn.fromNodeId);
       final toNode = _nodes.firstWhere((n) => n.id == conn.toNodeId);
-      if (fromNode.position.dx > toNode.position.dx) {
+      // ✅ الاتجاه الصحيح الآن: من اليمين إلى اليسار
+      // الخطأ يحدث عندما يكون المصدر (from) على يسار الهدف (to)
+      if (fromNode.position.dx < toNode.position.dx) {
         wrongConnections.add(conn.id);
         wrongNodes[conn.toNodeId] = true;
       }
@@ -419,7 +421,7 @@ class _BuilderScreenState extends State<BuilderScreen>
     );
   }
 
-  // --------------------- فحص القرب ---------------------
+  // --------------------- فحص القرب (التوصيل التلقائي معكوس) ---------------------
   void _checkProximity(String nodeId) {
     final movedNode = _nodes.firstWhere((n) => n.id == nodeId);
     final movedCenter =
@@ -453,10 +455,11 @@ class _BuilderScreenState extends State<BuilderScreen>
           ? closestNode
           : movedNode;
 
-      if (leftNode.type == NodeType.intent) {
-        _showConditionDialog(leftNode.id, rightNode.id);
+      // ✅ نجعل العقدة اليمنى هي المصدر (from) واليسرى هي الهدف (to)
+      if (rightNode.type == NodeType.intent) {
+        _showConditionDialog(rightNode.id, leftNode.id);
       } else {
-        _addConnectionWithCondition(leftNode.id, rightNode.id, null);
+        _addConnectionWithCondition(rightNode.id, leftNode.id, null);
       }
       _updateWrongConnections();
     }
@@ -633,7 +636,7 @@ class _BuilderScreenState extends State<BuilderScreen>
                                 },
                                 isWrongDirection:
                                     _wrongNodeMap[node.id] ?? false,
-                                wrongHint: 'اسحب لليمين ←',
+                                wrongHint: 'اسحب لليسار ←',
                               )),
                         ],
                       ),
