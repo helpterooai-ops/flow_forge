@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'builder_screen.dart';
+import 'pro_builder_screen.dart';
 import '../widgets/side_menu.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -31,11 +32,33 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
+                  color: const Color(0xFF0EA5E9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.rocket_launch_rounded,
+                    color: Colors.white, size: 24),
+              ),
+              tooltip: 'Pro Builder',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ProBuilderScreen()),
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 8.0),
+            child: IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
                   color: const Color(0xFF6366F1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child:
-                    const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+                child: const Icon(Icons.add_rounded,
+                    color: Colors.white, size: 24),
               ),
               tooltip: 'إنشاء خريطة جديدة',
               onPressed: () {
@@ -53,7 +76,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.account_tree_rounded, size: 64, color: Color(0xFFB0BEC5)),
+            Icon(Icons.account_tree_rounded,
+                size: 64, color: Color(0xFFB0BEC5)),
             SizedBox(height: 16),
             Text(
               'لا توجد خرائط بعد',
