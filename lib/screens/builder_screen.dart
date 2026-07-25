@@ -416,7 +416,7 @@ class _BuilderScreenState extends State<BuilderScreen>
     );
   }
 
-  // --------------------- فحص القرب والتوصيل التلقائي مع اكتشاف الاتجاه الخاطئ ---------------------
+  // --------------------- فحص القرب والتوصيل التلقائي مع اكتشاف الاتجاه المعاكس ---------------------
   void _checkProximity(String nodeId) {
     final movedNode = _nodes.firstWhere((n) => n.id == nodeId);
     final movedCenter =
@@ -443,6 +443,7 @@ class _BuilderScreenState extends State<BuilderScreen>
     }
 
     if (closestNode != null) {
+      // تحديد المصدر والهدف بحسب الموقع (اليسرى مصدر، اليمنى هدف)
       final leftNode = movedNode.position.dx < closestNode.position.dx
           ? movedNode
           : closestNode;
@@ -450,22 +451,22 @@ class _BuilderScreenState extends State<BuilderScreen>
           ? closestNode
           : movedNode;
 
-      // تحديد ما إذا كان الاتجاه معكوسًا
-      final bool isReversed =
-          (movedNode == leftNode &&
-                  movedNode.position.dx > closestNode.position.dx) ||
-              (movedNode == rightNode &&
-                  movedNode.position.dx < closestNode.position.dx);
-
-      // إنشاء الاتصال أولاً
+      // إنشاء الاتصال (سيحدد تلقائياً اليسرى كـ from واليمنى كـ to)
       if (leftNode.type == NodeType.intent) {
         _showConditionDialog(leftNode.id, rightNode.id);
       } else {
         _addConnectionWithCondition(leftNode.id, rightNode.id, null);
       }
 
+      // ✅ فحص ما إذا كان الاتصال معكوساً:
+      // إذا كانت العقدة المصدر (from = leftNode) تقع على يمين العقدة الهدف (to = rightNode)،
+      // فهذا يعني أن التدفق معكوس. لكن نظامنا دائماً يجعل from = اليسرى، لذلك لن يحدث هذا.
+      // المشكلة الفعلية تكون عندما يضع المستخدم العقدة الأولى على اليمين أصلاً.
+      // لذلك نفحص: إذا كانت العقدة التي تم سحبها (movedNode) هي اليمنى (rightNode)،
+      // فهذا يعني أن المستخدم سحب العقدة اليمنى نحو اليسرى – وهو اتجاه معاكس للتدفق.
+      final bool isReversed = movedNode.id == rightNode.id;
+
       if (isReversed) {
-        // الحصول على معرف الاتصال الذي أُنشئ للتو
         final wrongConn = _connections.lastWhere(
           (c) => c.fromNodeId == leftNode.id && c.toNodeId == rightNode.id,
         );
@@ -475,7 +476,6 @@ class _BuilderScreenState extends State<BuilderScreen>
           _wrongConnectionId = wrongConn.id;
         });
 
-        // إخفاء التأثير بعد 3 ثوانٍ
         Future.delayed(const Duration(seconds: 3), () {
           if (mounted) {
             setState(() {
@@ -609,8 +609,8 @@ class _BuilderScreenState extends State<BuilderScreen>
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : AnimatedBuilder(
-                animation: _dashController,
+            : ListenableBuilder(
+                listenable: _dashController,
                 builder: (context, child) {
                   return InteractiveViewer(
                     constrained: false,
