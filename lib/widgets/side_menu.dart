@@ -1,4 +1,3 @@
-cat > lib/widgets/side_menu.dart << 'EOF'
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -91,10 +90,22 @@ class _SideMenuState extends State<SideMenu> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('إعادة تسمية'),
-        content: TextField(controller: controller, decoration: const InputDecoration(labelText: 'اسم الخريطة')),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'اسم الخريطة'),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          ElevatedButton(onPressed: () { renameMap(id, controller.text.trim()); Navigator.pop(ctx); }, child: const Text('حفظ')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              renameMap(id, controller.text.trim());
+              Navigator.pop(ctx);
+            },
+            child: const Text('حفظ'),
+          ),
         ],
       ),
     );
@@ -107,9 +118,15 @@ class _SideMenuState extends State<SideMenu> {
         title: const Text('تأكيد الحذف'),
         content: Text('هل أنت متأكد من حذف "$name"؟ لا يمكن التراجع عن هذا الإجراء.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء'),
+          ),
           ElevatedButton(
-            onPressed: () { deleteMap(id); Navigator.pop(ctx); },
+            onPressed: () {
+              deleteMap(id);
+              Navigator.pop(ctx);
+            },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('حذف'),
           ),
@@ -126,7 +143,10 @@ class _SideMenuState extends State<SideMenu> {
           children: [
             const Padding(
               padding: EdgeInsets.all(16),
-              child: Text('الخرائط المعلقة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              child: Text(
+                'الخرائط المعلقة',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
             ),
             const Divider(),
             Expanded(
@@ -151,9 +171,18 @@ class _SideMenuState extends State<SideMenu> {
                               }
                             },
                             itemBuilder: (ctx) => [
-                              const PopupMenuItem(value: 'edit', child: Text('متابعة التحرير')),
-                              const PopupMenuItem(value: 'rename', child: Text('إعادة تسمية')),
-                              const PopupMenuItem(value: 'delete', child: Text('حذف', style: TextStyle(color: Colors.red))),
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Text('متابعة التحرير'),
+                              ),
+                              const PopupMenuItem(
+                                value: 'rename',
+                                child: Text('إعادة تسمية'),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Text('حذف', style: TextStyle(color: Colors.red)),
+                              ),
                             ],
                           ),
                         );
@@ -166,4 +195,3 @@ class _SideMenuState extends State<SideMenu> {
     );
   }
 }
-EOF
