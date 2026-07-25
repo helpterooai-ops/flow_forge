@@ -159,7 +159,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               secondary: Icon(_isDarkMode ? Iconsax.moon : Iconsax.sun_1, color: theme.colorScheme.primary),
               value: _isDarkMode,
               onChanged: _toggleDarkMode,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
           ),
           // قسم البوت
@@ -175,7 +174,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: Text(_botToken.isEmpty ? 'غير مضبوط' : 'مضبوط ✓'),
                   trailing: const Icon(Iconsax.edit),
                   onTap: _editBotToken,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 const Divider(height: 1, indent: 72),
                 ListTile(
@@ -184,7 +182,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: Text(_serverUrl),
                   trailing: const Icon(Iconsax.edit),
                   onTap: _editServerUrl,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
               ],
             ),
@@ -202,7 +199,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: const Text('حفظ كملف JSON'),
                   trailing: const Icon(Iconsax.arrow_right_3),
                   onTap: _exportAllMaps,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 const Divider(height: 1, indent: 72),
                 ListTile(
@@ -211,7 +207,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: const Text('لا يمكن التراجع'),
                   trailing: const Icon(Iconsax.arrow_right_3, color: Colors.red),
                   onTap: _clearAllMaps,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
               ],
             ),
@@ -225,7 +220,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: Icon(Iconsax.code_1, color: Colors.purple),
               title: Text('FlowForge'),
               subtitle: Text('الإصدار 1.0.0'),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
           ),
         ],
