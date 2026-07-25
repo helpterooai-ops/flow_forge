@@ -44,27 +44,42 @@ class BuilderScreen extends StatefulWidget {
   State<BuilderScreen> createState() => _BuilderScreenState();
 }
 
-class _BuilderScreenState extends State<BuilderScreen> {
+class _BuilderScreenState extends State<BuilderScreen>
+    with SingleTickerProviderStateMixin {
   final List<FlowNode> _nodes = [];
   final List<Connection> _connections = [];
   final Uuid _uuid = const Uuid();
   bool _isPublishing = false;
   bool _isLoading = true;
-  String? _wrongNodeId; // العقدة التي تم توصيلها بشكل معاكس
+  String? _wrongNodeId;
+  String? _wrongConnectionId;
+
+  late AnimationController _dashController;
 
   @override
   void initState() {
     super.initState();
+    _dashController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true);
+
     if (widget.savedMap != null) {
       _loadFromSavedMap();
     } else {
-      // بداية جديدة – لا تحميل أي شيء
       setState(() {
         _isLoading = false;
       });
     }
   }
 
+  @override
+  void dispose() {
+    _dashController.dispose();
+    super.dispose();
+  }
+
+  // --------------------- تحميل الخرائط ---------------------
   void _loadFromSavedMap() {
     final data = jsonDecode(widget.savedMap!.jsonData);
     setState(() {
@@ -93,6 +108,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
     });
   }
 
+  // --------------------- حفظ الخريطة في SharedPreferences ---------------------
   Future<void> _saveToSideMenu() async {
     final map = {
       'nodes': _nodes
@@ -114,14 +130,15 @@ class _BuilderScreenState extends State<BuilderScreen> {
     };
     final jsonData = jsonEncode(map);
     final mapId = widget.savedMap?.id ?? _uuid.v4();
-    final mapName =
-        widget.savedMap?.name ?? 'خريطة ${DateTime.now().millisecondsSinceEpoch}';
+    final mapName = widget.savedMap?.name ??
+        'خريطة ${DateTime.now().millisecondsSinceEpoch}';
 
     final prefs = await SharedPreferences.getInstance();
     final data = prefs.getString('saved_maps');
     List<SavedMap> maps = [];
     if (data != null) {
-      maps = (jsonDecode(data) as List).map((e) => SavedMap.fromJson(e)).toList();
+      maps =
+          (jsonDecode(data) as List).map((e) => SavedMap.fromJson(e)).toList();
     }
 
     final index = maps.indexWhere((m) => m.id == mapId);
@@ -144,13 +161,12 @@ class _BuilderScreenState extends State<BuilderScreen> {
     }
   }
 
-  // عند الرجوع للخلف – تجاهل التغييرات بدون حوار (لأن المحرر فارغ دائمًا)
+  // --------------------- الخروج من المحرر ---------------------
   Future<bool> _onWillPop() async {
-    // إذا أراد المستخدم حفظ التغييرات، يمكنه الضغط على 💾 قبل الخروج
-    // وإلا فالتغييرات تُهمل تلقائياً.
-    return true;
+    return true; // تجاهل تلقائي دون حوار
   }
 
+  // --------------------- حوار إضافة عقدة ---------------------
   void _showAddNodeDialog() {
     NodeType? selectedType;
     showDialog(
@@ -231,6 +247,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
     }
   }
 
+  // --------------------- إضافة عقدة جديدة ---------------------
   void _addNode(NodeType type) {
     setState(() {
       _nodes.add(FlowNode(
@@ -251,6 +268,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
     });
   }
 
+  // --------------------- تحريك العقد ---------------------
   void _onNodeMoved(String id, Offset delta) {
     setState(() {
       final index = _nodes.indexWhere((n) => n.id == id);
@@ -261,6 +279,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
     _checkProximity(id);
   }
 
+  // --------------------- حذف عقدة ---------------------
   void _deleteNode(String nodeId) {
     setState(() {
       _nodes.removeWhere((n) => n.id == nodeId);
@@ -269,6 +288,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
     });
   }
 
+  // --------------------- إضافة اتصال بين عقدتين ---------------------
   void _addConnectionWithCondition(
       String fromId, String toId, String? condition) {
     if (fromId == toId) return;
@@ -287,12 +307,14 @@ class _BuilderScreenState extends State<BuilderScreen> {
     }
   }
 
+  // --------------------- حذف اتصال ---------------------
   void _deleteConnection(String connId) {
     setState(() {
       _connections.removeWhere((c) => c.id == connId);
     });
   }
 
+  // --------------------- نشر الخريطة إلى الخادم ---------------------
   Future<void> _publishMap() async {
     if (_isPublishing) return;
     setState(() => _isPublishing = true);
@@ -333,8 +355,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-                Text('❌ فشل النشر (${response.statusCode}): ${response.body}'),
+            content: Text(
+                '❌ فشل النشر (${response.statusCode}): ${response.body}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -352,6 +374,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
     }
   }
 
+  // --------------------- تصدير JSON ---------------------
   void _exportJSON() {
     final map = {
       'nodes': _nodes
@@ -393,6 +416,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
     );
   }
 
+  // --------------------- فحص القرب والتوصيل التلقائي مع اكتشاف الاتجاه الخاطئ ---------------------
   void _checkProximity(String nodeId) {
     final movedNode = _nodes.firstWhere((n) => n.id == nodeId);
     final movedCenter =
@@ -426,32 +450,45 @@ class _BuilderScreenState extends State<BuilderScreen> {
           ? closestNode
           : movedNode;
 
-      // التحقق مما إذا كان الاتجاه معاكسًا (العقدة المسحوبة على اليسار لكنها في الأصل كانت على اليمين)
-      final bool isReversed = (movedNode == leftNode && movedNode.position.dx > closestNode.position.dx) ||
-                              (movedNode == rightNode && movedNode.position.dx < closestNode.position.dx);
+      // تحديد ما إذا كان الاتجاه معكوسًا
+      final bool isReversed =
+          (movedNode == leftNode &&
+                  movedNode.position.dx > closestNode.position.dx) ||
+              (movedNode == rightNode &&
+                  movedNode.position.dx < closestNode.position.dx);
 
-      if (isReversed) {
-        // إظهار تأثير تحذيري على العقدة المسحوبة (حد أحمر)
-        _wrongNodeId = movedNode.id;
-        setState(() {});
-        // إعادة تعيين اللون بعد ثانية واحدة
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            setState(() {
-              _wrongNodeId = null;
-            });
-          }
-        });
-      }
-
+      // إنشاء الاتصال أولاً
       if (leftNode.type == NodeType.intent) {
         _showConditionDialog(leftNode.id, rightNode.id);
       } else {
         _addConnectionWithCondition(leftNode.id, rightNode.id, null);
       }
+
+      if (isReversed) {
+        // الحصول على معرف الاتصال الذي أُنشئ للتو
+        final wrongConn = _connections.lastWhere(
+          (c) => c.fromNodeId == leftNode.id && c.toNodeId == rightNode.id,
+        );
+
+        setState(() {
+          _wrongNodeId = movedNode.id;
+          _wrongConnectionId = wrongConn.id;
+        });
+
+        // إخفاء التأثير بعد 3 ثوانٍ
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            setState(() {
+              _wrongNodeId = null;
+              _wrongConnectionId = null;
+            });
+          }
+        });
+      }
     }
   }
 
+  // --------------------- حوار شرط الانتقال (للعقد من نوع intent) ---------------------
   void _showConditionDialog(String fromId, String toId) {
     final controller = TextEditingController();
     showDialog(
@@ -484,6 +521,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
     );
   }
 
+  // --------------------- واجهة المستخدم ---------------------
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -522,7 +560,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: _isPublishing ? Colors.grey : const Color(0xFF6366F1),
+                  color:
+                      _isPublishing ? Colors.grey : const Color(0xFF6366F1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: _isPublishing
@@ -570,69 +609,85 @@ class _BuilderScreenState extends State<BuilderScreen> {
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : InteractiveViewer(
-                constrained: false,
-                boundaryMargin: const EdgeInsets.all(double.infinity),
-                minScale: 0.1,
-                maxScale: 2.0,
-                child: SizedBox(
-                  width: 3000,
-                  height: 3000,
-                  child: Stack(
-                    children: [
-                      CustomPaint(
-                        size: const Size(3000, 3000),
-                        painter: GridPainter(),
+            : AnimatedBuilder(
+                animation: _dashController,
+                builder: (context, child) {
+                  return InteractiveViewer(
+                    constrained: false,
+                    boundaryMargin: const EdgeInsets.all(double.infinity),
+                    minScale: 0.1,
+                    maxScale: 2.0,
+                    child: SizedBox(
+                      width: 3000,
+                      height: 3000,
+                      child: Stack(
+                        children: [
+                          CustomPaint(
+                            size: const Size(3000, 3000),
+                            painter: GridPainter(),
+                          ),
+                          CustomPaint(
+                            size: const Size(3000, 3000),
+                            painter: ConnectionPainter(
+                              connections: _connections,
+                              nodes: _nodes,
+                              wrongConnectionId: _wrongConnectionId,
+                              dashPhase: _dashController.value * 20,
+                            ),
+                          ),
+                          ..._connections.map((conn) {
+                            final from = _nodes
+                                .firstWhere((n) => n.id == conn.fromNodeId);
+                            final to = _nodes
+                                .firstWhere((n) => n.id == conn.toNodeId);
+                            return ConnectionDeleteButton(
+                              connection: conn,
+                              fromNode: from,
+                              toNode: to,
+                              onDelete: () => _deleteConnection(conn.id),
+                            );
+                          }),
+                          ..._nodes.map((node) => NodeWidget(
+                                node: node,
+                                onDrag: (delta) =>
+                                    _onNodeMoved(node.id, delta),
+                                onTitleChanged: (newTitle) {
+                                  setState(() {
+                                    node.title = newTitle;
+                                  });
+                                },
+                                onDelete: () => _deleteNode(node.id),
+                                onPropertiesChanged: () {
+                                  setState(() {});
+                                },
+                                isWrongDirection:
+                                    _wrongNodeId == node.id,
+                                wrongHint: 'اسحب لليمين ←',
+                              )),
+                        ],
                       ),
-                      CustomPaint(
-                        size: const Size(3000, 3000),
-                        painter: ConnectionPainter(
-                          connections: _connections,
-                          nodes: _nodes,
-                        ),
-                      ),
-                      ..._connections.map((conn) {
-                        final from = _nodes
-                            .firstWhere((n) => n.id == conn.fromNodeId);
-                        final to = _nodes
-                            .firstWhere((n) => n.id == conn.toNodeId);
-                        return ConnectionDeleteButton(
-                          connection: conn,
-                          fromNode: from,
-                          toNode: to,
-                          onDelete: () => _deleteConnection(conn.id),
-                        );
-                      }),
-                      ..._nodes.map((node) => NodeWidget(
-                            node: node,
-                            onDrag: (delta) =>
-                                _onNodeMoved(node.id, delta),
-                            onTitleChanged: (newTitle) {
-                              setState(() {
-                                node.title = newTitle;
-                              });
-                            },
-                            onDelete: () => _deleteNode(node.id),
-                            onPropertiesChanged: () {
-                              setState(() {});
-                            },
-                            // ✅ تمرير حالة الخطأ لتغيير لون الحد
-                            isWrongDirection: _wrongNodeId == node.id,
-                          )),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               ),
       ),
     );
   }
 }
 
+// --------------------- رسام الخطوط (يدعم الخط الأحمر المنقط والسهم) ---------------------
 class ConnectionPainter extends CustomPainter {
   final List<Connection> connections;
   final List<FlowNode> nodes;
+  final String? wrongConnectionId;
+  final double dashPhase;
 
-  ConnectionPainter({required this.connections, required this.nodes});
+  ConnectionPainter({
+    required this.connections,
+    required this.nodes,
+    this.wrongConnectionId,
+    this.dashPhase = 0,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -640,13 +695,12 @@ class ConnectionPainter extends CustomPainter {
       final fromNode = nodes.firstWhere((n) => n.id == conn.fromNodeId);
       final toNode = nodes.firstWhere((n) => n.id == conn.toNodeId);
 
-      final start = Offset(
-          fromNode.position.dx + 200, fromNode.position.dy + 40);
+      final start =
+          Offset(fromNode.position.dx + 200, fromNode.position.dy + 40);
       final end = Offset(toNode.position.dx, toNode.position.dy + 40);
 
+      final isWrong = conn.id == wrongConnectionId;
       final paint = Paint()
-        ..color = fromNode.color.withOpacity(0.6)
-        ..strokeWidth = 2.5
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
 
@@ -655,14 +709,69 @@ class ConnectionPainter extends CustomPainter {
         ..cubicTo(
             start.dx + 60, start.dy, end.dx - 60, end.dy, end.dx, end.dy);
 
-      canvas.drawPath(path, paint);
+      if (isWrong) {
+        // رسم الخط الأحمر المنقط
+        paint
+          ..color = Colors.red
+          ..strokeWidth = 2.5;
+        final dashedPath = _createDashedPath(path, dashPhase, 10, 8);
+        canvas.drawPath(dashedPath, paint);
+        // رسم سهم التوجيه
+        _drawArrow(canvas, start, end, Colors.red);
+      } else {
+        // رسم الخط العادي
+        paint
+          ..color = fromNode.color.withOpacity(0.6)
+          ..strokeWidth = 2.5;
+        canvas.drawPath(path, paint);
+      }
     }
   }
 
+  Path _createDashedPath(
+      Path source, double dashPhase, double dashLength, double gapLength) {
+    final metrics = source.computeMetrics();
+    final result = Path();
+    for (final metric in metrics) {
+      double distance = dashPhase % (dashLength + gapLength);
+      while (distance < metric.length) {
+        final start = metric.getTangentForOffset(distance)!.position;
+        final end = metric
+            .getTangentForOffset(
+                (distance + dashLength).clamp(0, metric.length))!
+            .position;
+        result.moveTo(start.dx, start.dy);
+        result.lineTo(end.dx, end.dy);
+        distance += dashLength + gapLength;
+      }
+    }
+    return result;
+  }
+
+  void _drawArrow(Canvas canvas, Offset start, Offset end, Color color) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final direction = end - start;
+    final length = direction.distance;
+    final unit = direction / length;
+    final arrowHead = end - unit * 15;
+    final perpendicular = Offset(-unit.dy, unit.dx) * 6;
+    final path = Path()
+      ..moveTo(end.dx, end.dy)
+      ..lineTo(arrowHead.dx - perpendicular.dx,
+          arrowHead.dy - perpendicular.dy)
+      ..lineTo(arrowHead.dx + perpendicular.dx,
+          arrowHead.dy + perpendicular.dy)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant ConnectionPainter oldDelegate) => true;
 }
 
+// --------------------- زر حذف الاتصال ---------------------
 class ConnectionDeleteButton extends StatelessWidget {
   final Connection connection;
   final FlowNode fromNode;
@@ -704,6 +813,7 @@ class ConnectionDeleteButton extends StatelessWidget {
   }
 }
 
+// --------------------- شبكة الخلفية ---------------------
 class GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

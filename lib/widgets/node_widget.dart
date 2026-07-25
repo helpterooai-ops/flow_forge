@@ -35,7 +35,8 @@ class NodeWidget extends StatefulWidget {
   final void Function(String newTitle)? onTitleChanged;
   final VoidCallback? onDelete;
   final VoidCallback? onPropertiesChanged;
-  final bool isWrongDirection; // ✅ جديد
+  final bool isWrongDirection;
+  final String wrongHint;
 
   const NodeWidget({
     super.key,
@@ -45,6 +46,7 @@ class NodeWidget extends StatefulWidget {
     this.onDelete,
     this.onPropertiesChanged,
     this.isWrongDirection = false,
+    this.wrongHint = 'خطأ في التوصيل',
   });
 
   @override
@@ -124,7 +126,8 @@ class _NodeWidgetState extends State<NodeWidget> {
     final titleCtrl = TextEditingController(text: widget.node.title);
     final promptCtrl = TextEditingController(text: widget.node.prompt);
     final varCtrl = TextEditingController(text: widget.node.variableName);
-    final isInputType = widget.node.type == NodeType.input || widget.node.type == NodeType.intent;
+    final isInputType = widget.node.type == NodeType.input ||
+        widget.node.type == NodeType.intent;
 
     showDialog(
       context: context,
@@ -140,12 +143,14 @@ class _NodeWidgetState extends State<NodeWidget> {
               const SizedBox(height: 12),
               TextField(
                   controller: promptCtrl,
-                  decoration: const InputDecoration(labelText: 'النص الإرشادي (Prompt)')),
+                  decoration: const InputDecoration(
+                      labelText: 'النص الإرشادي (Prompt)')),
               if (isInputType) ...[
                 const SizedBox(height: 12),
                 TextField(
                     controller: varCtrl,
-                    decoration: const InputDecoration(labelText: 'اسم المتغير')),
+                    decoration:
+                        const InputDecoration(labelText: 'اسم المتغير')),
               ],
             ],
           ),
@@ -160,7 +165,8 @@ class _NodeWidgetState extends State<NodeWidget> {
               Navigator.pop(ctx);
               widget.onDelete?.call();
             },
-            child: const Text('حذف العقدة', style: TextStyle(color: Colors.red)),
+            child: const Text('حذف العقدة',
+                style: TextStyle(color: Colors.red)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -202,18 +208,23 @@ class _NodeWidgetState extends State<NodeWidget> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
+              // -------------------- حاوية العقدة --------------------
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.8),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: widget.isWrongDirection ? Colors.red : widget.node.color.withOpacity(0.4),
+                    color: widget.isWrongDirection
+                        ? Colors.red
+                        : widget.node.color.withOpacity(0.4),
                     width: widget.isWrongDirection ? 2.0 : 1.0,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: widget.node.color.withOpacity(0.15),
+                      color: widget.isWrongDirection
+                          ? Colors.red.withOpacity(0.3)
+                          : widget.node.color.withOpacity(0.15),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -228,11 +239,18 @@ class _NodeWidgetState extends State<NodeWidget> {
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: widget.node.color.withOpacity(0.15),
+                            color: widget.isWrongDirection
+                                ? Colors.red.withOpacity(0.2)
+                                : widget.node.color.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(_iconForType(widget.node.type),
-                              size: 18, color: widget.node.color),
+                          child: Icon(
+                            _iconForType(widget.node.type),
+                            size: 18,
+                            color: widget.isWrongDirection
+                                ? Colors.red
+                                : widget.node.color,
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -244,7 +262,9 @@ class _NodeWidgetState extends State<NodeWidget> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
-                                    color: widget.node.color,
+                                    color: widget.isWrongDirection
+                                        ? Colors.red
+                                        : widget.node.color,
                                   ),
                                   decoration: const InputDecoration(
                                     border: InputBorder.none,
@@ -258,7 +278,9 @@ class _NodeWidgetState extends State<NodeWidget> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
-                                    color: widget.node.color,
+                                    color: widget.isWrongDirection
+                                        ? Colors.red
+                                        : widget.node.color,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -278,6 +300,8 @@ class _NodeWidgetState extends State<NodeWidget> {
                   ],
                 ),
               ),
+
+              // -------------------- نقطة التوصيل اليمنى (مخرج) --------------------
               Positioned(
                 right: -6,
                 top: 0,
@@ -287,19 +311,26 @@ class _NodeWidgetState extends State<NodeWidget> {
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: widget.node.color,
+                      color: widget.isWrongDirection
+                          ? Colors.red
+                          : widget.node.color,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: const [
+                      boxShadow: [
                         BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 4,
-                            offset: Offset(0, 2)),
+                          color: widget.isWrongDirection
+                              ? Colors.red.withOpacity(0.6)
+                              : Colors.black26,
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
                       ],
                     ),
                   ),
                 ),
               ),
+
+              // -------------------- نقطة التوصيل اليسرى (مدخل) --------------------
               Positioned(
                 left: -6,
                 top: 0,
@@ -309,19 +340,66 @@ class _NodeWidgetState extends State<NodeWidget> {
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: widget.node.color,
+                      color: widget.isWrongDirection
+                          ? Colors.red
+                          : widget.node.color,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: const [
+                      boxShadow: [
                         BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 4,
-                            offset: Offset(0, 2)),
+                          color: widget.isWrongDirection
+                              ? Colors.red.withOpacity(0.6)
+                              : Colors.black26,
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
                       ],
                     ),
                   ),
                 ),
               ),
+
+              // -------------------- فقاعة التحذير العلوية --------------------
+              if (widget.isWrongDirection)
+                Positioned(
+                  top: -45,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.red, width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.warning_amber_rounded,
+                              color: Colors.red, size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            widget.wrongHint,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
