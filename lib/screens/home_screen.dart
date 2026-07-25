@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'builder_screen.dart';
 import '../widgets/side_menu.dart';
@@ -12,16 +11,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  final SideMenu _sideMenu = const SideMenu();
-
-  void _openMap(SavedMap map) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => BuilderScreen(savedMap: map),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +34,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: const Color(0xFF6366F1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+                child:
+                    const Icon(Icons.add_rounded, color: Colors.white, size: 24),
               ),
               tooltip: 'إنشاء خريطة جديدة',
               onPressed: () {
@@ -58,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      drawer: _sideMenu,
+      drawer: const SideMenu(),
       body: const Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
