@@ -10,8 +10,6 @@ class FlowNode {
   Offset position;
   Color color;
   NodeType type;
-
-  // حقول إضافية
   String variableName;
   String prompt;
   bool isPaused;
@@ -37,6 +35,7 @@ class NodeWidget extends StatefulWidget {
   final void Function(String newTitle)? onTitleChanged;
   final VoidCallback? onDelete;
   final VoidCallback? onPropertiesChanged;
+  final bool isWrongDirection; // ✅ جديد
 
   const NodeWidget({
     super.key,
@@ -45,6 +44,7 @@ class NodeWidget extends StatefulWidget {
     this.onTitleChanged,
     this.onDelete,
     this.onPropertiesChanged,
+    this.isWrongDirection = false,
   });
 
   @override
@@ -134,12 +134,18 @@ class _NodeWidgetState extends State<NodeWidget> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'العنوان')),
+              TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(labelText: 'العنوان')),
               const SizedBox(height: 12),
-              TextField(controller: promptCtrl, decoration: const InputDecoration(labelText: 'النص الإرشادي (Prompt)')),
+              TextField(
+                  controller: promptCtrl,
+                  decoration: const InputDecoration(labelText: 'النص الإرشادي (Prompt)')),
               if (isInputType) ...[
                 const SizedBox(height: 12),
-                TextField(controller: varCtrl, decoration: const InputDecoration(labelText: 'اسم المتغير')),
+                TextField(
+                    controller: varCtrl,
+                    decoration: const InputDecoration(labelText: 'اسم المتغير')),
               ],
             ],
           ),
@@ -202,7 +208,9 @@ class _NodeWidgetState extends State<NodeWidget> {
                   color: Colors.white.withOpacity(0.8),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                      color: widget.node.color.withOpacity(0.4), width: 1),
+                    color: widget.isWrongDirection ? Colors.red : widget.node.color.withOpacity(0.4),
+                    width: widget.isWrongDirection ? 2.0 : 1.0,
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: widget.node.color.withOpacity(0.15),

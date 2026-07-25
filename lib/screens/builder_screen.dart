@@ -1,8 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:iconsax/iconsax.dart';
@@ -51,8 +49,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
   final List<Connection> _connections = [];
   final Uuid _uuid = const Uuid();
   bool _isPublishing = false;
-  bool _hasUnsavedChanges = false;
   bool _isLoading = true;
+  String? _wrongNodeId; // العقدة التي تم توصيلها بشكل معاكس
 
   @override
   void initState() {
@@ -60,7 +58,10 @@ class _BuilderScreenState extends State<BuilderScreen> {
     if (widget.savedMap != null) {
       _loadFromSavedMap();
     } else {
-      _loadFromLocal();
+      // بداية جديدة – لا تحميل أي شيء
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -89,72 +90,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
     });
     setState(() {
       _isLoading = false;
-      _hasUnsavedChanges = false;
     });
-  }
-
-  Future<String> get _localPath async {
-    final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/flowforge_current_map.json';
-  }
-
-  Future<void> _loadFromLocal() async {
-    try {
-      final file = File(await _localPath);
-      if (await file.exists()) {
-        final contents = await file.readAsString();
-        final data = jsonDecode(contents);
-        setState(() {
-          _nodes.clear();
-          _connections.clear();
-          for (final n in data['nodes']) {
-            _nodes.add(FlowNode(
-              id: n['id'],
-              title: n['title'],
-              subtitle: n['subtitle'] ?? '',
-              position: Offset((n['x'] ?? 0).toDouble(), (n['y'] ?? 0).toDouble()),
-              color: Color(int.parse(n['color'] ?? 'ff6366f1', radix: 16)),
-              type: NodeType.values.firstWhere((e) => e.name == n['type']),
-              variableName: n['variableName'] ?? '',
-              prompt: n['prompt'] ?? '',
-              isPaused: n['isPaused'] ?? false,
-              fallbackNodeId: n['fallbackNodeId'],
-            ));
-          }
-          for (final c in data['connections']) {
-            _connections.add(Connection.fromJson(c));
-          }
-        });
-      }
-    } catch (_) {}
-    setState(() {
-      _isLoading = false;
-      _hasUnsavedChanges = false;
-    });
-  }
-
-  Future<void> _saveToLocal() async {
-    final map = {
-      'nodes': _nodes
-          .map((n) => {
-                'id': n.id,
-                'type': n.type.name,
-                'title': n.title,
-                'subtitle': n.subtitle,
-                'color': n.color.value.toRadixString(16),
-                'x': n.position.dx,
-                'y': n.position.dy,
-                'variableName': n.variableName,
-                'prompt': n.prompt,
-                'isPaused': n.isPaused,
-                'fallbackNodeId': n.fallbackNodeId,
-              })
-          .toList(),
-      'connections': _connections.map((c) => c.toJson()).toList(),
-    };
-    final file = File(await _localPath);
-    await file.writeAsString(jsonEncode(map));
-    setState(() => _hasUnsavedChanges = false);
   }
 
   Future<void> _saveToSideMenu() async {
@@ -178,7 +114,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
     };
     final jsonData = jsonEncode(map);
     final mapId = widget.savedMap?.id ?? _uuid.v4();
-    final mapName = widget.savedMap?.name ?? 'خريطة ${DateTime.now().millisecondsSinceEpoch}';
+    final mapName =
+        widget.savedMap?.name ?? 'خريطة ${DateTime.now().millisecondsSinceEpoch}';
 
     final prefs = await SharedPreferences.getInstance();
     final data = prefs.getString('saved_maps');
@@ -195,53 +132,23 @@ class _BuilderScreenState extends State<BuilderScreen> {
       maps.add(newMap);
     }
 
-    await prefs.setString('saved_maps', jsonEncode(maps.map((m) => m.toJson()).toList()));
+    await prefs.setString(
+        'saved_maps', jsonEncode(maps.map((m) => m.toJson()).toList()));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('✅ تم حفظ الخريطة في القائمة الجانبية'),
+          content: Text('✅ تم حفظ الخريطة في صفحة الخرائط المعلقة'),
           backgroundColor: Colors.green,
         ),
       );
     }
   }
 
-  void _markChanged() {
-    if (!_hasUnsavedChanges) {
-      setState(() => _hasUnsavedChanges = true);
-    }
-  }
-
+  // عند الرجوع للخلف – تجاهل التغييرات بدون حوار (لأن المحرر فارغ دائمًا)
   Future<bool> _onWillPop() async {
-    if (!_hasUnsavedChanges) return true;
-    final action = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('حفظ التغييرات؟'),
-        content: const Text('لديك تغييرات غير محفوظة. ماذا تريد أن تفعل؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, 'ignore'),
-            child: const Text('تجاهل'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, 'cancel'),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, 'save'),
-            child: const Text('حفظ'),
-          ),
-        ],
-      ),
-    );
-    if (action == 'save') {
-      await _saveToLocal();
-      return true;
-    } else if (action == 'ignore') {
-      return true;
-    }
-    return false;
+    // إذا أراد المستخدم حفظ التغييرات، يمكنه الضغط على 💾 قبل الخروج
+    // وإلا فالتغييرات تُهمل تلقائياً.
+    return true;
   }
 
   void _showAddNodeDialog() {
@@ -342,7 +249,6 @@ class _BuilderScreenState extends State<BuilderScreen> {
         fallbackNodeId: null,
       ));
     });
-    _markChanged();
   }
 
   void _onNodeMoved(String id, Offset delta) {
@@ -352,7 +258,6 @@ class _BuilderScreenState extends State<BuilderScreen> {
         _nodes[index].position += delta;
       }
     });
-    _markChanged();
     _checkProximity(id);
   }
 
@@ -362,7 +267,6 @@ class _BuilderScreenState extends State<BuilderScreen> {
       _connections.removeWhere(
           (c) => c.fromNodeId == nodeId || c.toNodeId == nodeId);
     });
-    _markChanged();
   }
 
   void _addConnectionWithCondition(
@@ -380,7 +284,6 @@ class _BuilderScreenState extends State<BuilderScreen> {
           condition: condition,
         ));
       });
-      _markChanged();
     }
   }
 
@@ -388,7 +291,6 @@ class _BuilderScreenState extends State<BuilderScreen> {
     setState(() {
       _connections.removeWhere((c) => c.id == connId);
     });
-    _markChanged();
   }
 
   Future<void> _publishMap() async {
@@ -524,6 +426,24 @@ class _BuilderScreenState extends State<BuilderScreen> {
           ? closestNode
           : movedNode;
 
+      // التحقق مما إذا كان الاتجاه معاكسًا (العقدة المسحوبة على اليسار لكنها في الأصل كانت على اليمين)
+      final bool isReversed = (movedNode == leftNode && movedNode.position.dx > closestNode.position.dx) ||
+                              (movedNode == rightNode && movedNode.position.dx < closestNode.position.dx);
+
+      if (isReversed) {
+        // إظهار تأثير تحذيري على العقدة المسحوبة (حد أحمر)
+        _wrongNodeId = movedNode.id;
+        setState(() {});
+        // إعادة تعيين اللون بعد ثانية واحدة
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            setState(() {
+              _wrongNodeId = null;
+            });
+          }
+        });
+      }
+
       if (leftNode.type == NodeType.intent) {
         _showConditionDialog(leftNode.id, rightNode.id);
       } else {
@@ -594,7 +514,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
                 child:
                     const Icon(Icons.save, color: Colors.white, size: 24),
               ),
-              tooltip: 'حفظ في القائمة الجانبية',
+              tooltip: 'حفظ في الخرائط المعلقة',
               onPressed: _saveToSideMenu,
             ),
             const SizedBox(width: 4),
@@ -647,18 +567,6 @@ class _BuilderScreenState extends State<BuilderScreen> {
             ),
             const SizedBox(width: 12),
           ],
-          bottom: const PreferredSize(
-            preferredSize: Size.fromHeight(30),
-            child: ColoredBox(
-              color: Color(0xFFF1F5F9),
-              child: Center(
-                child: Text(
-                  '⬅️ تدفق المحادثة: من اليسار إلى اليمين',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                ),
-              ),
-            ),
-          ),
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -703,13 +611,13 @@ class _BuilderScreenState extends State<BuilderScreen> {
                               setState(() {
                                 node.title = newTitle;
                               });
-                              _markChanged();
                             },
                             onDelete: () => _deleteNode(node.id),
                             onPropertiesChanged: () {
                               setState(() {});
-                              _markChanged();
                             },
+                            // ✅ تمرير حالة الخطأ لتغيير لون الحد
+                            isWrongDirection: _wrongNodeId == node.id,
                           )),
                     ],
                   ),
