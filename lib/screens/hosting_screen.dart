@@ -1,4 +1,4 @@
-import 'package:highlight/themes/monokai-sublime.dart';
+import 'package:highlight/themes/atom-one-dark.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -178,7 +178,7 @@ class _HostingScreenState extends State<HostingScreen> {
               ),
               height: 300,
               child: CodeTheme(
-                data: CodeThemeData(styles: monokaiSublimeTheme),
+                data: CodeThemeData(styles: atomOneDarkTheme),
                 child: SingleChildScrollView(
                   child: CodeField(
                     controller: _codeController,
