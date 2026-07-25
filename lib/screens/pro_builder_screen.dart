@@ -69,6 +69,8 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
   final List<ProStep> _steps = [];
   final Uuid _uuid = const Uuid();
   bool _showInstructions = false;
+  int _currentPage = 0;
+  final PageController _pageController = PageController();
 
   @override
   void initState() {
@@ -81,8 +83,13 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
     final seen = prefs.getBool('pro_builder_instructions_seen') ?? false;
     if (!seen) {
       setState(() => _showInstructions = true);
-      await prefs.setBool('pro_builder_instructions_seen', true);
     }
+  }
+
+  void _dismissInstructions() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('pro_builder_instructions_seen', true);
+    setState(() => _showInstructions = false);
   }
 
   void _addStep(NodeType type) {
@@ -90,10 +97,8 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
       final step = ProStep(
         id: _uuid.v4(),
         type: type,
-        title: type == NodeType.message
-            ? 'رسالة جديدة'
-            : (type == NodeType.input ? 'إدخال جديد' : 'تصنيف جديد'),
-        prompt: type == NodeType.input ? 'أدخل السؤال هنا' : '',
+        title: _defaultTitle(type),
+        prompt: _defaultPrompt(type),
         isExpanded: true,
       );
       for (final s in _steps) {
@@ -101,6 +106,51 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
       }
       _steps.add(step);
     });
+  }
+
+  String _defaultTitle(NodeType type) {
+    switch (type) {
+      case NodeType.message:
+        return 'رسالة نصية';
+      case NodeType.question:
+        return 'سؤال';
+      case NodeType.action:
+        return 'إجراء';
+      case NodeType.condition:
+        return 'شرط';
+      case NodeType.input:
+        return 'إدخال مباشر';
+      case NodeType.intent:
+        return 'تصنيف نية';
+    }
+  }
+
+  String _defaultPrompt(NodeType type) {
+    switch (type) {
+      case NodeType.input:
+        return 'اكتب السؤال هنا...';
+      case NodeType.intent:
+        return 'اكتب السؤال الذي سيسأله البوت...';
+      default:
+        return '';
+    }
+  }
+
+  String _typeDescription(NodeType type) {
+    switch (type) {
+      case NodeType.message:
+        return 'يرسل البوت رسالة نصية للمستخدم. استخدمها للترحيب أو التعليمات.';
+      case NodeType.question:
+        return 'يطرح البوت سؤالاً وينتظر إجابة المستخدم. استخدمها لجمع معلومات.';
+      case NodeType.action:
+        return 'ينفذ البوت عملية تلقائية (مثل إرسال ملف أو تغيير حالة).';
+      case NodeType.condition:
+        return 'يحدد مسار المحادثة بناءً على تحقق شرط معين (نعم/لا مثلاً).';
+      case NodeType.input:
+        return 'يطلب البوت من المستخدم إدخال بيانات (اسم، رقم هاتف) ويخزنها في متغير.';
+      case NodeType.intent:
+        return 'يحلل البوت رسالة المستخدم بالذكاء الاصطناعي ويقرر أين ينتقل.';
+    }
   }
 
   void _deleteStep(int index) {
@@ -225,7 +275,7 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
       ),
       body: Column(
         children: [
-          if (_showInstructions) _buildInstructions(),
+          if (_showInstructions) _buildOnboarding(),
           Expanded(
             child: _steps.isEmpty
                 ? Center(
@@ -253,46 +303,119 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
     );
   }
 
-  Widget _buildInstructions() {
+  Widget _buildOnboarding() {
+    final pages = [
+      _onboardingPage(
+        Icons.rocket_launch_rounded,
+        'مرحباً بك في Pro Builder',
+        'أسرع طريقة لبناء بوت ذكي لمتجرك دون خبرة تقنية.',
+      ),
+      _onboardingPage(
+        Icons.add_circle_outline_rounded,
+        'إضافة خطوة جديدة',
+        'اضغط على زر + لإضافة خطوة، ثم اختر نوعها من القائمة.',
+      ),
+      _onboardingPage(
+        Icons.edit_note_rounded,
+        'تعبئة المعلومات',
+        'اكتب النص الذي سيرسله البوت، وأي تفاصيل إضافية مطلوبة.',
+      ),
+      _onboardingPage(
+        Icons.alt_route_rounded,
+        'بناء التدفق',
+        'أضف خطوات متتالية، وسيتم ربطها تلقائياً.',
+      ),
+      _onboardingPage(
+        Icons.open_in_new_rounded,
+        'افتح الخريطة',
+        'عند الانتهاء، اضغط "فتح في المحرر" لترى الخريطة جاهزة.',
+      ),
+    ];
+
     return Container(
       margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.only(top: 16, bottom: 8),
       decoration: BoxDecoration(
         color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.blue.shade200),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(children: [
-            Icon(Icons.info_outline, color: Colors.blue.shade700),
-            const SizedBox(width: 8),
-            const Text('تعليمات',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Colors.blue))
-          ]),
-          const SizedBox(height: 12),
-          const Text('1. اختر نوع الخطوة (رسالة، إدخال، تصنيف).',
-              style: TextStyle(fontSize: 13)),
-          const Text('2. اكتب النص الذي سيقوله البوت.',
-              style: TextStyle(fontSize: 13)),
-          const Text('3. أضف خطوات أخرى لتكوين التدفق.',
-              style: TextStyle(fontSize: 13)),
-          const Text('4. اضغط "فتح في المحرر" لرؤية الخريطة.',
-              style: TextStyle(fontSize: 13)),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: ElevatedButton(
-              onPressed: () => setState(() => _showInstructions = false),
-              child: const Text('حسناً'),
+          SizedBox(
+            height: 200,
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: pages.length,
+              onPageChanged: (index) => setState(() => _currentPage = index),
+              itemBuilder: (context, index) => pages[index],
             ),
+          ),
+          const SizedBox(height: 12),
+          // نقاط التنقل
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(pages.length, (index) {
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _currentPage == index ? Colors.blue : Colors.grey[300],
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton(
+                onPressed: _dismissInstructions,
+                child: const Text('تخطي'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (_currentPage == pages.length - 1) {
+                    _dismissInstructions();
+                  } else {
+                    _pageController.nextPage(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                  }
+                },
+                child: Text(
+                  _currentPage == pages.length - 1 ? 'افهم ذلك' : 'التالي',
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _onboardingPage(IconData icon, String title, String description) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 48, color: Colors.blue),
+        const SizedBox(height: 16),
+        Text(title,
+            style: const TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue)),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Text(
+            description,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 14, color: Colors.black87),
+          ),
+        ),
+      ],
     );
   }
 
@@ -300,31 +423,82 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('نوع الخطوة'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _typeOption(NodeType.message, 'رسالة', Iconsax.message,
-                const Color(0xFF6366F1)),
-            _typeOption(NodeType.input, 'إدخال مباشر', Iconsax.text_block,
-                const Color(0xFFF97316)),
-            _typeOption(NodeType.intent, 'تصنيف نية',
-                Icons.psychology_rounded, const Color(0xFF8B5CF6)),
-          ],
+        title: const Text('اختر نوع الخطوة'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _typeOption(
+                NodeType.message,
+                'رسالة',
+                Iconsax.message,
+                const Color(0xFF6366F1),
+                'يرسل البوت رسالة نصية عادية. استخدم هذا النوع للترحيب أو الإرشادات.',
+              ),
+              _typeOption(
+                NodeType.question,
+                'سؤال',
+                Iconsax.message_question,
+                const Color(0xFF0EA5E9),
+                'يطرح البوت سؤالاً وينتظر إجابة المستخدم.',
+              ),
+              _typeOption(
+                NodeType.action,
+                'إجراء',
+                Iconsax.setting_2,
+                const Color(0xFF10B981),
+                'ينفذ البوت عملية تلقائية (مثل إرسال ملف أو تحديث بيانات).',
+              ),
+              _typeOption(
+                NodeType.condition,
+                'شرط',
+                Iconsax.arrow_3,
+                const Color(0xFFF59E0B),
+                'يحدد مسار المحادثة بناءً على تحقق شرط معين.',
+              ),
+              _typeOption(
+                NodeType.input,
+                'إدخال مباشر',
+                Iconsax.text_block,
+                const Color(0xFFF97316),
+                'يطلب البوت من المستخدم إدخال بيانات (مثل الاسم أو رقم الهاتف) ويخزنها في متغير.',
+              ),
+              _typeOption(
+                NodeType.intent,
+                'تصنيف نية',
+                Icons.psychology_rounded,
+                const Color(0xFF8B5CF6),
+                'يحلل البوت رسالة المستخدم بالذكاء الاصطناعي ليقرر إلى أين ينتقل.',
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _typeOption(
-      NodeType type, String label, IconData icon, Color color) {
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(label),
-      onTap: () {
-        Navigator.pop(context);
-        _addStep(type);
-      },
+      NodeType type, String label, IconData icon, Color color, String description) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        title: Text(label,
+            style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+        subtitle:
+            Text(description, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        onTap: () {
+          Navigator.pop(context);
+          _addStep(type);
+        },
+      ),
     );
   }
 
@@ -344,6 +518,7 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOut,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 InkWell(
                   onTap: () => _toggleExpanded(index),
@@ -389,10 +564,36 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // تلميح وظيفة العقدة
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline,
+                                  size: 18, color: Colors.blue.shade700),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _typeDescription(step.type),
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue.shade700),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         TextField(
-                          decoration:
-                              const InputDecoration(labelText: 'العنوان'),
+                          decoration: const InputDecoration(
+                              labelText: 'العنوان (النص الذي سيرسله البوت)'),
                           controller: TextEditingController(text: step.title)
                             ..selection = TextSelection.collapsed(
                                 offset: step.title.length),
@@ -404,7 +605,8 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                             step.type == NodeType.intent)
                           TextField(
                             decoration: const InputDecoration(
-                                labelText: 'النص الإرشادي (Prompt)'),
+                                labelText:
+                                    'النص الإرشادي (ما يراه المستخدم قبل الإدخال)'),
                             controller: TextEditingController(text: step.prompt)
                               ..selection = TextSelection.collapsed(
                                   offset: step.prompt.length),
@@ -415,7 +617,8 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                           const SizedBox(height: 12),
                           TextField(
                             decoration: const InputDecoration(
-                                labelText: 'اسم المتغير'),
+                                labelText:
+                                    'اسم المتغير (لتخزين إجابة المستخدم)'),
                             controller: TextEditingController(
                                 text: step.variableName)
                               ..selection = TextSelection.collapsed(
@@ -428,7 +631,8 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                           const SizedBox(height: 12),
                           TextField(
                             decoration: const InputDecoration(
-                                labelText: 'شرط الانتقال'),
+                                labelText:
+                                    'شرط الانتقال (الكلمة التي توجّه للمسار التالي)'),
                             controller: TextEditingController(
                                 text: step.condition)
                               ..selection = TextSelection.collapsed(
@@ -467,12 +671,16 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
     switch (type) {
       case NodeType.message:
         return 'رسالة';
+      case NodeType.question:
+        return 'سؤال';
+      case NodeType.action:
+        return 'إجراء';
+      case NodeType.condition:
+        return 'شرط';
       case NodeType.input:
         return 'إدخال';
       case NodeType.intent:
         return 'تصنيف';
-      default:
-        return '';
     }
   }
 }
