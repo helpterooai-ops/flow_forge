@@ -97,10 +97,9 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
       final step = ProStep(
         id: _uuid.v4(),
         type: type,
-        title: _defaultTitle(type),
-        prompt: _defaultPrompt(type),
-        isExpanded: true,
+        // ✅ لا توجد نصوص افتراضية – الحقول فارغة تماماً
       );
+      step.isExpanded = true;
       for (final s in _steps) {
         s.isExpanded = false;
       }
@@ -108,49 +107,75 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
     });
   }
 
-  String _defaultTitle(NodeType type) {
+  // دالة ترجع تلميحاً مناسباً لنوع العقدة
+  String _typeHint(NodeType type) {
     switch (type) {
       case NodeType.message:
-        return 'رسالة نصية';
+        return 'اكتب الرسالة التي سيرسلها البوت للمستخدم';
       case NodeType.question:
-        return 'سؤال';
+        return 'اكتب السؤال الذي سيطرحه البوت';
       case NodeType.action:
-        return 'إجراء';
+        return 'صف الإجراء التلقائي (مثلاً: إرسال ملف)';
       case NodeType.condition:
-        return 'شرط';
+        return 'اكتب الشرط (مثلاً: إذا كانت الإجابة نعم)';
       case NodeType.input:
-        return 'إدخال مباشر';
+        return 'اكتب العنوان الظاهر للعقدة';
       case NodeType.intent:
-        return 'تصنيف نية';
+        return 'اكتب عنوان العقدة (مثلاً: تصنيف الطلب)';
     }
   }
 
-  String _defaultPrompt(NodeType type) {
+  String _promptHint(NodeType type) {
     switch (type) {
       case NodeType.input:
-        return 'اكتب السؤال هنا...';
+        return 'السؤال الذي سيُطرح على المستخدم (مثلاً: ما اسمك؟)';
       case NodeType.intent:
-        return 'اكتب السؤال الذي سيسأله البوت...';
+        return 'السؤال الذي سيُطرح على المستخدم (مثلاً: كيف يمكنني مساعدتك؟)';
       default:
         return '';
     }
   }
 
+  String _variableHint() {
+    return 'اسم المتغير لتخزين الإجابة (مثلاً: customer_name)';
+  }
+
+  String _conditionHint() {
+    return 'الكلمة التي إذا قالها العميل سينتقل إلى هذه العقدة';
+  }
+
+  // هل يمكن أن تكون هذه العقدة أول خطوة؟
+  bool get _isFirstStep => _steps.isEmpty;
+  bool _canBeFirst(NodeType type) {
+    return type != NodeType.intent && type != NodeType.action;
+  }
+
   String _typeDescription(NodeType type) {
+    final String base;
     switch (type) {
       case NodeType.message:
-        return 'يرسل البوت رسالة نصية للمستخدم. استخدمها للترحيب أو التعليمات.';
+        base = 'يرسل البوت رسالة نصية للمستخدم. استخدمها للترحيب أو التعليمات.';
+        break;
       case NodeType.question:
-        return 'يطرح البوت سؤالاً وينتظر إجابة المستخدم. استخدمها لجمع معلومات.';
+        base = 'يطرح البوت سؤالاً وينتظر إجابة المستخدم. استخدمها لجمع معلومات.';
+        break;
       case NodeType.action:
-        return 'ينفذ البوت عملية تلقائية (مثل إرسال ملف أو تغيير حالة).';
+        base = 'ينفذ البوت عملية تلقائية (مثل إرسال ملف أو تغيير حالة).';
+        break;
       case NodeType.condition:
-        return 'يحدد مسار المحادثة بناءً على تحقق شرط معين (نعم/لا مثلاً).';
+        base = 'يحدد مسار المحادثة بناءً على تحقق شرط معين (نعم/لا مثلاً).';
+        break;
       case NodeType.input:
-        return 'يطلب البوت من المستخدم إدخال بيانات (اسم، رقم هاتف) ويخزنها في متغير.';
+        base = 'يطلب البوت من المستخدم إدخال بيانات (اسم، رقم هاتف) ويخزنها في متغير.';
+        break;
       case NodeType.intent:
-        return 'يحلل البوت رسالة المستخدم بالذكاء الاصطناعي ويقرر أين ينتقل.';
+        base = 'يحلل البوت رسالة المستخدم بالذكاء الاصطناعي ويقرر أين ينتقل.';
+        break;
     }
+    if (_isFirstStep && !_canBeFirst(type)) {
+      return '$base\n⚠️ لا يمكن استخدام هذه العقدة كأول خطوة. يجب أن يسبقها رسالة أو إدخال.';
+    }
+    return base;
   }
 
   void _deleteStep(int index) {
@@ -352,7 +377,6 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          // نقاط التنقل
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(pages.length, (index) {
@@ -434,6 +458,7 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                 Iconsax.message,
                 const Color(0xFF6366F1),
                 'يرسل البوت رسالة نصية عادية. استخدم هذا النوع للترحيب أو الإرشادات.',
+                canBeFirst: true,
               ),
               _typeOption(
                 NodeType.question,
@@ -441,6 +466,7 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                 Iconsax.message_question,
                 const Color(0xFF0EA5E9),
                 'يطرح البوت سؤالاً وينتظر إجابة المستخدم.',
+                canBeFirst: true,
               ),
               _typeOption(
                 NodeType.action,
@@ -448,6 +474,7 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                 Iconsax.setting_2,
                 const Color(0xFF10B981),
                 'ينفذ البوت عملية تلقائية (مثل إرسال ملف أو تحديث بيانات).',
+                canBeFirst: false,
               ),
               _typeOption(
                 NodeType.condition,
@@ -455,6 +482,7 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                 Iconsax.arrow_3,
                 const Color(0xFFF59E0B),
                 'يحدد مسار المحادثة بناءً على تحقق شرط معين.',
+                canBeFirst: false,
               ),
               _typeOption(
                 NodeType.input,
@@ -462,6 +490,7 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                 Iconsax.text_block,
                 const Color(0xFFF97316),
                 'يطلب البوت من المستخدم إدخال بيانات (مثل الاسم أو رقم الهاتف) ويخزنها في متغير.',
+                canBeFirst: true,
               ),
               _typeOption(
                 NodeType.intent,
@@ -469,6 +498,7 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                 Icons.psychology_rounded,
                 const Color(0xFF8B5CF6),
                 'يحلل البوت رسالة المستخدم بالذكاء الاصطناعي ليقرر إلى أين ينتقل.',
+                canBeFirst: false,
               ),
             ],
           ),
@@ -478,7 +508,7 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
   }
 
   Widget _typeOption(
-      NodeType type, String label, IconData icon, Color color, String description) {
+      NodeType type, String label, IconData icon, Color color, String description, {required bool canBeFirst}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: ListTile(
@@ -492,8 +522,12 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
         ),
         title: Text(label,
             style: TextStyle(fontWeight: FontWeight.bold, color: color)),
-        subtitle:
-            Text(description, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        subtitle: Text(
+          _isFirstStep && !canBeFirst
+              ? '$description\n⚠️ لا يمكن أن تكون الخطوة الأولى'
+              : description,
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
         onTap: () {
           Navigator.pop(context);
           _addStep(type);
@@ -566,7 +600,6 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // تلميح وظيفة العقدة
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
@@ -592,8 +625,10 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                           ),
                         ),
                         TextField(
-                          decoration: const InputDecoration(
-                              labelText: 'العنوان (النص الذي سيرسله البوت)'),
+                          decoration: InputDecoration(
+                            labelText: 'العنوان',
+                            hintText: _typeHint(step.type),
+                          ),
                           controller: TextEditingController(text: step.title)
                             ..selection = TextSelection.collapsed(
                                 offset: step.title.length),
@@ -604,9 +639,10 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                         if (step.type == NodeType.input ||
                             step.type == NodeType.intent)
                           TextField(
-                            decoration: const InputDecoration(
-                                labelText:
-                                    'النص الإرشادي (ما يراه المستخدم قبل الإدخال)'),
+                            decoration: InputDecoration(
+                              labelText: 'النص الإرشادي (Prompt)',
+                              hintText: _promptHint(step.type),
+                            ),
                             controller: TextEditingController(text: step.prompt)
                               ..selection = TextSelection.collapsed(
                                   offset: step.prompt.length),
@@ -616,9 +652,10 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                         if (step.type == NodeType.input) ...[
                           const SizedBox(height: 12),
                           TextField(
-                            decoration: const InputDecoration(
-                                labelText:
-                                    'اسم المتغير (لتخزين إجابة المستخدم)'),
+                            decoration: InputDecoration(
+                              labelText: 'اسم المتغير',
+                              hintText: _variableHint(),
+                            ),
                             controller: TextEditingController(
                                 text: step.variableName)
                               ..selection = TextSelection.collapsed(
@@ -630,9 +667,10 @@ class _ProBuilderScreenState extends State<ProBuilderScreen> {
                         if (step.type == NodeType.intent) ...[
                           const SizedBox(height: 12),
                           TextField(
-                            decoration: const InputDecoration(
-                                labelText:
-                                    'شرط الانتقال (الكلمة التي توجّه للمسار التالي)'),
+                            decoration: InputDecoration(
+                              labelText: 'شرط الانتقال',
+                              hintText: _conditionHint(),
+                            ),
                             controller: TextEditingController(
                                 text: step.condition)
                               ..selection = TextSelection.collapsed(

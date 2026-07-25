@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/saved_maps_screen.dart';
+import '../screens/settings_screen.dart';
 import 'toast_widget.dart';
 
 class SideMenu extends StatelessWidget {
@@ -81,10 +82,9 @@ class SideMenu extends StatelessWidget {
               _buildMenuItem(
                 icon: Icons.settings_outlined,
                 title: 'الإعدادات',
-                enabled: false,
                 onTap: () {
                   Navigator.pop(context);
-                  AppToast.show(context, 'قريباً...');
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
                 },
               ),
               const Spacer(),
