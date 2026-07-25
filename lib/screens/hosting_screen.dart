@@ -1,4 +1,3 @@
-import 'package:highlight/themes/atom-one-dark.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -6,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:highlight/languages/python.dart';
+// ✅ هذا هو التعديل الصحيح: استدعاء الثيم من حزمة flutter_highlight وليس highlight
+import 'package:flutter_highlight/themes/atom-one-dark.dart';   
 import '../widgets/toast_widget.dart';
 
 class HostingScreen extends StatefulWidget {
@@ -63,12 +64,10 @@ class _HostingScreenState extends State<HostingScreen> {
     });
   }
 
-  // فحص بسيط للأخطاء
   String? _validate() {
     if (_projectNameController.text.trim().isEmpty) return 'اسم المشروع مطلوب';
     if (_botTokenController.text.trim().isEmpty) return 'توكن البوت مطلوب';
     if (_codeController.text.trim().isEmpty) return 'كود البوت مطلوب';
-    // تحقق أساسي من وجود توكن البوت في الكود (اختياري)
     if (!_codeController.text.contains('BOT_TOKEN')) {
       return 'يجب أن يحتوي الكود على BOT_TOKEN (متغير البيئة)';
     }
@@ -139,7 +138,6 @@ class _HostingScreenState extends State<HostingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ----- اسم المشروع -----
             Text('اسم المشروع', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextField(
@@ -150,8 +148,6 @@ class _HostingScreenState extends State<HostingScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // ----- توكن البوت -----
             Text('توكن البوت', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextField(
@@ -167,8 +163,6 @@ class _HostingScreenState extends State<HostingScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // ----- محرر الكود -----
             Text('كود بايثون', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Container(
@@ -187,8 +181,6 @@ class _HostingScreenState extends State<HostingScreen> {
                 ),
               ),
             ),
-
-            // ----- رسالة الخطأ -----
             if (_errorMessage != null)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
@@ -208,8 +200,6 @@ class _HostingScreenState extends State<HostingScreen> {
                   ),
                 ),
               ),
-
-            // ----- حالة النشر -----
             if (_isDeploying)
               Padding(
                 padding: const EdgeInsets.only(top: 16),
@@ -221,10 +211,7 @@ class _HostingScreenState extends State<HostingScreen> {
                   ],
                 ),
               ),
-
             const SizedBox(height: 24),
-
-            // ----- أزرار التحكم -----
             Row(
               children: [
                 Expanded(
