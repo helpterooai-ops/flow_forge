@@ -15,6 +15,8 @@ dependencies:
   path_provider: ^2.1.0
   shared_preferences: ^2.2.0
   iconsax: ^0.0.8
+  flutter_code_editor: ^0.3.8
+  highlight: ^0.7.0
 
 dev_dependencies:
   flutter_test:
