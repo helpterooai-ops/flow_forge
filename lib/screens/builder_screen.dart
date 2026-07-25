@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:iconsax/iconsax.dart';
 import '../widgets/node_widget.dart';
+import '../widgets/toast_widget.dart';
 import '../models/saved_map.dart';
 
 class Connection {
@@ -51,8 +52,9 @@ class _BuilderScreenState extends State<BuilderScreen>
   final Uuid _uuid = const Uuid();
   bool _isPublishing = false;
   bool _isLoading = true;
-  String? _wrongNodeId;
-  String? _wrongConnectionId;
+
+  Set<String> _wrongConnectionIds = {};
+  Map<String, bool> _wrongNodeMap = {};
 
   late AnimationController _dashController;
 
@@ -103,6 +105,7 @@ class _BuilderScreenState extends State<BuilderScreen>
         _connections.add(Connection.fromJson(c));
       }
     });
+    _updateWrongConnections();
     setState(() {
       _isLoading = false;
     });
@@ -152,18 +155,13 @@ class _BuilderScreenState extends State<BuilderScreen>
     await prefs.setString(
         'saved_maps', jsonEncode(maps.map((m) => m.toJson()).toList()));
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ تم حفظ الخريطة في صفحة الخرائط المعلقة'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      AppToast.show(context, 'تم الحفظ في الخرائط المعلقة');
     }
   }
 
   // --------------------- الخروج من المحرر ---------------------
   Future<bool> _onWillPop() async {
-    return true; // تجاهل تلقائي دون حوار
+    return true;
   }
 
   // --------------------- حوار إضافة عقدة ---------------------
@@ -247,7 +245,6 @@ class _BuilderScreenState extends State<BuilderScreen>
     }
   }
 
-  // --------------------- إضافة عقدة جديدة ---------------------
   void _addNode(NodeType type) {
     setState(() {
       _nodes.add(FlowNode(
@@ -268,7 +265,6 @@ class _BuilderScreenState extends State<BuilderScreen>
     });
   }
 
-  // --------------------- تحريك العقد ---------------------
   void _onNodeMoved(String id, Offset delta) {
     setState(() {
       final index = _nodes.indexWhere((n) => n.id == id);
@@ -276,19 +272,19 @@ class _BuilderScreenState extends State<BuilderScreen>
         _nodes[index].position += delta;
       }
     });
+    _updateWrongConnections();
     _checkProximity(id);
   }
 
-  // --------------------- حذف عقدة ---------------------
   void _deleteNode(String nodeId) {
     setState(() {
       _nodes.removeWhere((n) => n.id == nodeId);
       _connections.removeWhere(
           (c) => c.fromNodeId == nodeId || c.toNodeId == nodeId);
     });
+    _updateWrongConnections();
   }
 
-  // --------------------- إضافة اتصال بين عقدتين ---------------------
   void _addConnectionWithCondition(
       String fromId, String toId, String? condition) {
     if (fromId == toId) return;
@@ -304,17 +300,41 @@ class _BuilderScreenState extends State<BuilderScreen>
           condition: condition,
         ));
       });
+      _updateWrongConnections();
     }
   }
 
-  // --------------------- حذف اتصال ---------------------
   void _deleteConnection(String connId) {
     setState(() {
       _connections.removeWhere((c) => c.id == connId);
     });
+    _updateWrongConnections();
   }
 
-  // --------------------- نشر الخريطة إلى الخادم ---------------------
+  // --------------------- تحديث حالة التحذير ---------------------
+  void _updateWrongConnections() {
+    final wrongConnections = <String>{};
+    final wrongNodes = <String, bool>{};
+
+    for (final conn in _connections) {
+      final fromNode = _nodes.firstWhere((n) => n.id == conn.fromNodeId);
+      final toNode = _nodes.firstWhere((n) => n.id == conn.toNodeId);
+      if (fromNode.position.dx > toNode.position.dx) {
+        wrongConnections.add(conn.id);
+        wrongNodes[conn.toNodeId] = true;
+      }
+    }
+
+    if (wrongConnections.length != _wrongConnectionIds.length ||
+        !wrongConnections.containsAll(_wrongConnectionIds)) {
+      setState(() {
+        _wrongConnectionIds = wrongConnections;
+        _wrongNodeMap = wrongNodes;
+      });
+    }
+  }
+
+  // --------------------- النشر والتصدير ---------------------
   Future<void> _publishMap() async {
     if (_isPublishing) return;
     setState(() => _isPublishing = true);
@@ -346,35 +366,18 @@ class _BuilderScreenState extends State<BuilderScreen>
       );
       if (!mounted) return;
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ تم نشر الخريطة بنجاح! البوت جاهز الآن.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppToast.show(context, 'تم نشر الخريطة بنجاح');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                '❌ فشل النشر (${response.statusCode}): ${response.body}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppToast.show(context, 'فشل النشر (${response.statusCode})', isError: true);
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ خطأ في الاتصال: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppToast.show(context, 'خطأ في الاتصال', isError: true);
     } finally {
       if (mounted) setState(() => _isPublishing = false);
     }
   }
 
-  // --------------------- تصدير JSON ---------------------
   void _exportJSON() {
     final map = {
       'nodes': _nodes
@@ -399,7 +402,7 @@ class _BuilderScreenState extends State<BuilderScreen>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('🎉 تم تصدير الخريطة'),
+        title: const Text('تصدير الخريطة'),
         content: SingleChildScrollView(
           child: SelectableText(
             jsonString,
@@ -416,7 +419,7 @@ class _BuilderScreenState extends State<BuilderScreen>
     );
   }
 
-  // --------------------- فحص القرب والتوصيل التلقائي مع اكتشاف الاتجاه المعاكس ---------------------
+  // --------------------- فحص القرب ---------------------
   void _checkProximity(String nodeId) {
     final movedNode = _nodes.firstWhere((n) => n.id == nodeId);
     final movedCenter =
@@ -443,7 +446,6 @@ class _BuilderScreenState extends State<BuilderScreen>
     }
 
     if (closestNode != null) {
-      // تحديد المصدر والهدف بحسب الموقع (اليسرى مصدر، اليمنى هدف)
       final leftNode = movedNode.position.dx < closestNode.position.dx
           ? movedNode
           : closestNode;
@@ -451,44 +453,15 @@ class _BuilderScreenState extends State<BuilderScreen>
           ? closestNode
           : movedNode;
 
-      // إنشاء الاتصال (سيحدد تلقائياً اليسرى كـ from واليمنى كـ to)
       if (leftNode.type == NodeType.intent) {
         _showConditionDialog(leftNode.id, rightNode.id);
       } else {
         _addConnectionWithCondition(leftNode.id, rightNode.id, null);
       }
-
-      // ✅ فحص ما إذا كان الاتصال معكوساً:
-      // إذا كانت العقدة المصدر (from = leftNode) تقع على يمين العقدة الهدف (to = rightNode)،
-      // فهذا يعني أن التدفق معكوس. لكن نظامنا دائماً يجعل from = اليسرى، لذلك لن يحدث هذا.
-      // المشكلة الفعلية تكون عندما يضع المستخدم العقدة الأولى على اليمين أصلاً.
-      // لذلك نفحص: إذا كانت العقدة التي تم سحبها (movedNode) هي اليمنى (rightNode)،
-      // فهذا يعني أن المستخدم سحب العقدة اليمنى نحو اليسرى – وهو اتجاه معاكس للتدفق.
-      final bool isReversed = movedNode.id == rightNode.id;
-
-      if (isReversed) {
-        final wrongConn = _connections.lastWhere(
-          (c) => c.fromNodeId == leftNode.id && c.toNodeId == rightNode.id,
-        );
-
-        setState(() {
-          _wrongNodeId = movedNode.id;
-          _wrongConnectionId = wrongConn.id;
-        });
-
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) {
-            setState(() {
-              _wrongNodeId = null;
-              _wrongConnectionId = null;
-            });
-          }
-        });
-      }
+      _updateWrongConnections();
     }
   }
 
-  // --------------------- حوار شرط الانتقال (للعقد من نوع intent) ---------------------
   void _showConditionDialog(String fromId, String toId) {
     final controller = TextEditingController();
     showDialog(
@@ -549,8 +522,7 @@ class _BuilderScreenState extends State<BuilderScreen>
                   color: const Color(0xFF6366F1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child:
-                    const Icon(Icons.save, color: Colors.white, size: 24),
+                child: const Icon(Icons.save, color: Colors.white, size: 24),
               ),
               tooltip: 'حفظ في الخرائط المعلقة',
               onPressed: _saveToSideMenu,
@@ -560,8 +532,7 @@ class _BuilderScreenState extends State<BuilderScreen>
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color:
-                      _isPublishing ? Colors.grey : const Color(0xFF6366F1),
+                  color: _isPublishing ? Colors.grey : const Color(0xFF6366F1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: _isPublishing
@@ -631,7 +602,7 @@ class _BuilderScreenState extends State<BuilderScreen>
                             painter: ConnectionPainter(
                               connections: _connections,
                               nodes: _nodes,
-                              wrongConnectionId: _wrongConnectionId,
+                              wrongConnectionIds: _wrongConnectionIds,
                               dashPhase: _dashController.value * 20,
                             ),
                           ),
@@ -661,7 +632,7 @@ class _BuilderScreenState extends State<BuilderScreen>
                                   setState(() {});
                                 },
                                 isWrongDirection:
-                                    _wrongNodeId == node.id,
+                                    _wrongNodeMap[node.id] ?? false,
                                 wrongHint: 'اسحب لليمين ←',
                               )),
                         ],
@@ -675,17 +646,17 @@ class _BuilderScreenState extends State<BuilderScreen>
   }
 }
 
-// --------------------- رسام الخطوط (يدعم الخط الأحمر المنقط والسهم) ---------------------
+// --------------------- ConnectionPainter ---------------------
 class ConnectionPainter extends CustomPainter {
   final List<Connection> connections;
   final List<FlowNode> nodes;
-  final String? wrongConnectionId;
+  final Set<String> wrongConnectionIds;
   final double dashPhase;
 
   ConnectionPainter({
     required this.connections,
     required this.nodes,
-    this.wrongConnectionId,
+    required this.wrongConnectionIds,
     this.dashPhase = 0,
   });
 
@@ -699,7 +670,7 @@ class ConnectionPainter extends CustomPainter {
           Offset(fromNode.position.dx + 200, fromNode.position.dy + 40);
       final end = Offset(toNode.position.dx, toNode.position.dy + 40);
 
-      final isWrong = conn.id == wrongConnectionId;
+      final isWrong = wrongConnectionIds.contains(conn.id);
       final paint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
@@ -710,16 +681,13 @@ class ConnectionPainter extends CustomPainter {
             start.dx + 60, start.dy, end.dx - 60, end.dy, end.dx, end.dy);
 
       if (isWrong) {
-        // رسم الخط الأحمر المنقط
         paint
           ..color = Colors.red
           ..strokeWidth = 2.5;
         final dashedPath = _createDashedPath(path, dashPhase, 10, 8);
         canvas.drawPath(dashedPath, paint);
-        // رسم سهم التوجيه
         _drawArrow(canvas, start, end, Colors.red);
       } else {
-        // رسم الخط العادي
         paint
           ..color = fromNode.color.withOpacity(0.6)
           ..strokeWidth = 2.5;
@@ -771,7 +739,7 @@ class ConnectionPainter extends CustomPainter {
   bool shouldRepaint(covariant ConnectionPainter oldDelegate) => true;
 }
 
-// --------------------- زر حذف الاتصال ---------------------
+// --------------------- ConnectionDeleteButton ---------------------
 class ConnectionDeleteButton extends StatelessWidget {
   final Connection connection;
   final FlowNode fromNode;
@@ -813,7 +781,7 @@ class ConnectionDeleteButton extends StatelessWidget {
   }
 }
 
-// --------------------- شبكة الخلفية ---------------------
+// --------------------- GridPainter ---------------------
 class GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
