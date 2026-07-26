@@ -3,10 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:flutter_code_editor/flutter_code_editor.dart';
-import 'package:highlight/languages/python.dart';
-// ✅ هذا هو التعديل الصحيح: استدعاء الثيم من حزمة flutter_highlight وليس highlight
-import 'package:flutter_highlight/themes/atom-one-dark.dart';   
 import '../widgets/toast_widget.dart';
 
 class HostingScreen extends StatefulWidget {
@@ -19,31 +15,26 @@ class HostingScreen extends StatefulWidget {
 class _HostingScreenState extends State<HostingScreen> {
   final TextEditingController _projectNameController = TextEditingController();
   final TextEditingController _botTokenController = TextEditingController();
-  late final CodeController _codeController;
+  final TextEditingController _pythonCodeController = TextEditingController();
 
   bool _tokenVisible = false;
   bool _isDeploying = false;
   String _deployStatus = '';
-  String? _errorMessage;
+
+  // ✅ رابط الخادم المحلي (نفق localhost.run)
+  String _serverUrl = 'https://74ab023b6d2a84.lhr.life';
 
   @override
   void initState() {
     super.initState();
-    _codeController = CodeController(
-      text: '',
-      language: python,
-    );
-    _loadSavedData();
+    _loadSettings();
   }
 
-  Future<void> _loadSavedData() async {
+  Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getString('hosting_project');
-    if (data != null) {
-      final map = jsonDecode(data);
-      _projectNameController.text = map['projectName'] ?? '';
-      _botTokenController.text = map['botToken'] ?? '';
-      _codeController.text = map['pythonCode'] ?? '';
+    final savedUrl = prefs.getString('server_url');
+    if (savedUrl != null && savedUrl.isNotEmpty) {
+      _serverUrl = savedUrl;
     }
   }
 
@@ -52,7 +43,7 @@ class _HostingScreenState extends State<HostingScreen> {
     final map = {
       'projectName': _projectNameController.text.trim(),
       'botToken': _botTokenController.text.trim(),
-      'pythonCode': _codeController.text,
+      'pythonCode': _pythonCodeController.text,
     };
     await prefs.setString('hosting_project', jsonEncode(map));
     AppToast.show(context, 'تم الحفظ محلياً');
@@ -64,38 +55,27 @@ class _HostingScreenState extends State<HostingScreen> {
     });
   }
 
-  String? _validate() {
-    if (_projectNameController.text.trim().isEmpty) return 'اسم المشروع مطلوب';
-    if (_botTokenController.text.trim().isEmpty) return 'توكن البوت مطلوب';
-    if (_codeController.text.trim().isEmpty) return 'كود البوت مطلوب';
-    if (!_codeController.text.contains('BOT_TOKEN')) {
-      return 'يجب أن يحتوي الكود على BOT_TOKEN (متغير البيئة)';
-    }
-    return null;
-  }
-
   Future<void> _deployProject() async {
-    final error = _validate();
-    if (error != null) {
-      setState(() => _errorMessage = error);
-      AppToast.show(context, error, isError: true);
+    if (_projectNameController.text.trim().isEmpty ||
+        _botTokenController.text.trim().isEmpty ||
+        _pythonCodeController.text.isEmpty) {
+      AppToast.show(context, 'جميع الحقول مطلوبة', isError: true);
       return;
     }
 
     setState(() {
       _isDeploying = true;
       _deployStatus = 'جاري النشر...';
-      _errorMessage = null;
     });
 
     try {
       final response = await http.post(
-        Uri.parse('https://flow-forge-server.vercel.app/api/v1/deploy'),
+        Uri.parse('$_serverUrl/api/v1/deploy'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'projectName': _projectNameController.text.trim(),
           'botToken': _botTokenController.text.trim(),
-          'pythonCode': _codeController.text,
+          'pythonCode': _pythonCodeController.text,
         }),
       );
 
@@ -103,26 +83,16 @@ class _HostingScreenState extends State<HostingScreen> {
         AppToast.show(context, 'تم نشر البوت بنجاح! وهو الآن شغال على تيليجرام.');
       } else {
         final data = jsonDecode(response.body);
-        setState(() => _errorMessage = data['error'] ?? 'فشل النشر');
-        AppToast.show(context, _errorMessage!, isError: true);
+        AppToast.show(context, data['error'] ?? 'فشل النشر', isError: true);
       }
     } catch (e) {
-      setState(() => _errorMessage = 'خطأ في الاتصال بالخادم');
-      AppToast.show(context, _errorMessage!, isError: true);
+      AppToast.show(context, 'خطأ في الاتصال بالخادم', isError: true);
     } finally {
       setState(() {
         _isDeploying = false;
         _deployStatus = '';
       });
     }
-  }
-
-  @override
-  void dispose() {
-    _codeController.dispose();
-    _projectNameController.dispose();
-    _botTokenController.dispose();
-    super.dispose();
   }
 
   @override
@@ -138,6 +108,7 @@ class _HostingScreenState extends State<HostingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // اسم المشروع
             Text('اسم المشروع', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextField(
@@ -148,6 +119,8 @@ class _HostingScreenState extends State<HostingScreen> {
               ),
             ),
             const SizedBox(height: 20),
+
+            // توكن البوت
             Text('توكن البوت', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextField(
@@ -163,46 +136,24 @@ class _HostingScreenState extends State<HostingScreen> {
               ),
             ),
             const SizedBox(height: 20),
+
+            // كود بايثون
             Text('كود بايثون', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade400),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              height: 300,
-              child: CodeTheme(
-                data: CodeThemeData(styles: atomOneDarkTheme),
-                child: SingleChildScrollView(
-                  child: CodeField(
-                    controller: _codeController,
-                    textStyle: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                  ),
-                ),
+            TextField(
+              controller: _pythonCodeController,
+              maxLines: 8,
+              decoration: InputDecoration(
+                hintText: 'الصق كود البوت هنا...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
-            if (_errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline, color: Colors.red, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(_errorMessage!, style: TextStyle(color: Colors.red.shade700, fontSize: 13))),
-                    ],
-                  ),
-                ),
-              ),
+            const SizedBox(height: 20),
+
+            // حالة النشر
             if (_isDeploying)
               Padding(
-                padding: const EdgeInsets.only(top: 16),
+                padding: const EdgeInsets.only(bottom: 16),
                 child: Column(
                   children: [
                     LinearProgressIndicator(color: theme.colorScheme.primary),
@@ -211,7 +162,8 @@ class _HostingScreenState extends State<HostingScreen> {
                   ],
                 ),
               ),
-            const SizedBox(height: 24),
+
+            // أزرار التحكم
             Row(
               children: [
                 Expanded(
