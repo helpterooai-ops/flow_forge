@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:flutter_code_editor/flutter_code_editor.dart';
+import 'package:highlight/languages/python.dart';
+import 'package:flutter_highlight/themes/atom-one-dark.dart';
 import '../widgets/toast_widget.dart';
 
 class HostingScreen extends StatefulWidget {
@@ -15,26 +18,33 @@ class HostingScreen extends StatefulWidget {
 class _HostingScreenState extends State<HostingScreen> {
   final TextEditingController _projectNameController = TextEditingController();
   final TextEditingController _botTokenController = TextEditingController();
-  final TextEditingController _pythonCodeController = TextEditingController();
+  late final CodeController _codeController;
 
   bool _tokenVisible = false;
   bool _isDeploying = false;
   String _deployStatus = '';
 
-  // ✅ رابط الخادم المحلي (نفق localhost.run)
-  String _serverUrl = 'https://74ab023b6d2a84.lhr.life';
+  // ✅ تم تحديث الرابط إلى النفق الجديد
+  String _serverUrl = 'https://daa1d2f666da19.lhr.life';
 
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    _codeController = CodeController(
+      text: '',
+      language: python,
+    );
+    _loadSavedData();
   }
 
-  Future<void> _loadSettings() async {
+  Future<void> _loadSavedData() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedUrl = prefs.getString('server_url');
-    if (savedUrl != null && savedUrl.isNotEmpty) {
-      _serverUrl = savedUrl;
+    final data = prefs.getString('hosting_project');
+    if (data != null) {
+      final map = jsonDecode(data);
+      _projectNameController.text = map['projectName'] ?? '';
+      _botTokenController.text = map['botToken'] ?? '';
+      _codeController.text = map['pythonCode'] ?? '';
     }
   }
 
@@ -43,7 +53,7 @@ class _HostingScreenState extends State<HostingScreen> {
     final map = {
       'projectName': _projectNameController.text.trim(),
       'botToken': _botTokenController.text.trim(),
-      'pythonCode': _pythonCodeController.text,
+      'pythonCode': _codeController.text,
     };
     await prefs.setString('hosting_project', jsonEncode(map));
     AppToast.show(context, 'تم الحفظ محلياً');
@@ -58,7 +68,7 @@ class _HostingScreenState extends State<HostingScreen> {
   Future<void> _deployProject() async {
     if (_projectNameController.text.trim().isEmpty ||
         _botTokenController.text.trim().isEmpty ||
-        _pythonCodeController.text.isEmpty) {
+        _codeController.text.trim().isEmpty) {
       AppToast.show(context, 'جميع الحقول مطلوبة', isError: true);
       return;
     }
@@ -75,7 +85,7 @@ class _HostingScreenState extends State<HostingScreen> {
         body: jsonEncode({
           'projectName': _projectNameController.text.trim(),
           'botToken': _botTokenController.text.trim(),
-          'pythonCode': _pythonCodeController.text,
+          'pythonCode': _codeController.text,
         }),
       );
 
@@ -96,6 +106,14 @@ class _HostingScreenState extends State<HostingScreen> {
   }
 
   @override
+  void dispose() {
+    _codeController.dispose();
+    _projectNameController.dispose();
+    _botTokenController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
@@ -108,7 +126,6 @@ class _HostingScreenState extends State<HostingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // اسم المشروع
             Text('اسم المشروع', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextField(
@@ -120,7 +137,6 @@ class _HostingScreenState extends State<HostingScreen> {
             ),
             const SizedBox(height: 20),
 
-            // توكن البوت
             Text('توكن البوت', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextField(
@@ -137,20 +153,26 @@ class _HostingScreenState extends State<HostingScreen> {
             ),
             const SizedBox(height: 20),
 
-            // كود بايثون
             Text('كود بايثون', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            TextField(
-              controller: _pythonCodeController,
-              maxLines: 8,
-              decoration: InputDecoration(
-                hintText: 'الصق كود البوت هنا...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade400),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              height: 300,
+              child: CodeTheme(
+                data: CodeThemeData(styles: atomOneDarkTheme),
+                child: SingleChildScrollView(
+                  child: CodeField(
+                    controller: _codeController,
+                    textStyle: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 20),
 
-            // حالة النشر
             if (_isDeploying)
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
@@ -163,7 +185,6 @@ class _HostingScreenState extends State<HostingScreen> {
                 ),
               ),
 
-            // أزرار التحكم
             Row(
               children: [
                 Expanded(
