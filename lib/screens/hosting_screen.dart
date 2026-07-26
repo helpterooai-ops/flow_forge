@@ -27,12 +27,14 @@ class _HostingScreenState extends State<HostingScreen> {
   // الرابط الثابت لخادم FlowForge على Vercel
   final String _serverUrl = 'https://flow-forge-server.vercel.app';
 
-  // الكود الافتراضي الجاهز الذي يعمل على Vercel
+  // الكود الافتراضي الجاهز الذي يعمل على Vercel (مع nest-asyncio)
   final String _defaultCode = '''import os
 from flask import Flask, request
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 import asyncio
+import nest_asyncio
+nest_asyncio.apply()
 
 TOKEN = os.environ.get('BOT_TOKEN')
 
