@@ -24,14 +24,48 @@ class _HostingScreenState extends State<HostingScreen> {
   bool _isDeploying = false;
   String _deployStatus = '';
 
-  // ✅ تم تحديث الرابط إلى النفق الجديد
-  String _serverUrl = 'https://daa1d2f666da19.lhr.life';
+  // الرابط الثابت لخادم FlowForge على Vercel
+  final String _serverUrl = 'https://flow-forge-server.vercel.app';
+
+  // الكود الافتراضي الجاهز الذي يعمل على Vercel
+  final String _defaultCode = '''import os
+from flask import Flask, request
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
+import asyncio
+
+TOKEN = os.environ.get('BOT_TOKEN')
+
+application = Application.builder().token(TOKEN).build()
+
+async def start(update, context):
+    await update.message.reply_text(f'أهلاً بك يا {update.effective_user.first_name}!')
+
+async def echo(update, context):
+    await update.message.reply_text(f'قلت: {update.message.text}')
+
+application.add_handler(CommandHandler('start', start))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+
+app = Flask(__name__)
+
+@app.route('/api/bot', methods=['POST'])
+def webhook():
+    data = request.get_json()
+    update = Update.de_json(data, application.bot)
+    asyncio.run(application.process_update(update))
+    return 'OK'
+
+@app.route('/')
+def home():
+    return 'Bot is running!'
+''';
 
   @override
   void initState() {
     super.initState();
     _codeController = CodeController(
-      text: '',
+      text: _defaultCode,
       language: python,
     );
     _loadSavedData();
@@ -44,7 +78,9 @@ class _HostingScreenState extends State<HostingScreen> {
       final map = jsonDecode(data);
       _projectNameController.text = map['projectName'] ?? '';
       _botTokenController.text = map['botToken'] ?? '';
-      _codeController.text = map['pythonCode'] ?? '';
+      if (map['pythonCode'] != null && map['pythonCode'].toString().isNotEmpty) {
+        _codeController.text = map['pythonCode'];
+      }
     }
   }
 
@@ -66,10 +102,8 @@ class _HostingScreenState extends State<HostingScreen> {
   }
 
   Future<void> _deployProject() async {
-    if (_projectNameController.text.trim().isEmpty ||
-        _botTokenController.text.trim().isEmpty ||
-        _codeController.text.trim().isEmpty) {
-      AppToast.show(context, 'جميع الحقول مطلوبة', isError: true);
+    if (_botTokenController.text.trim().isEmpty) {
+      AppToast.show(context, 'الرجاء إدخال توكن البوت', isError: true);
       return;
     }
 
@@ -83,7 +117,9 @@ class _HostingScreenState extends State<HostingScreen> {
         Uri.parse('$_serverUrl/api/v1/deploy'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'projectName': _projectNameController.text.trim(),
+          'projectName': _projectNameController.text.trim().isNotEmpty
+              ? _projectNameController.text.trim()
+              : 'my-bot',
           'botToken': _botTokenController.text.trim(),
           'pythonCode': _codeController.text,
         }),
@@ -126,6 +162,30 @@ class _HostingScreenState extends State<HostingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // تنبيه أن الكود جاهز
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'الكود جاهز! فقط أدخل توكن البوت واضغط نشر الآن.',
+                      style: TextStyle(fontSize: 13, color: Colors.green),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // اسم المشروع
             Text('اسم المشروع', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextField(
@@ -137,6 +197,7 @@ class _HostingScreenState extends State<HostingScreen> {
             ),
             const SizedBox(height: 20),
 
+            // توكن البوت
             Text('توكن البوت', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextField(
@@ -153,6 +214,7 @@ class _HostingScreenState extends State<HostingScreen> {
             ),
             const SizedBox(height: 20),
 
+            // كود بايثون (محرر الأكواد)
             Text('كود بايثون', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Container(
@@ -173,6 +235,7 @@ class _HostingScreenState extends State<HostingScreen> {
             ),
             const SizedBox(height: 20),
 
+            // حالة النشر
             if (_isDeploying)
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
@@ -185,6 +248,7 @@ class _HostingScreenState extends State<HostingScreen> {
                 ),
               ),
 
+            // أزرار التحكم
             Row(
               children: [
                 Expanded(
